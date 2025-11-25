@@ -1,0 +1,16 @@
+[package]
+name = "hello"
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tbs-common = { path = "../../crates/tbs-common" }
+
+clap = { workspace = true, features = ["derive"] }
+indicatif = { workspace = true }
+
+[lints]
+workspace = true
