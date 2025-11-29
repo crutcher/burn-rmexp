@@ -240,7 +240,7 @@ impl<B: Backend> DynTensor<B> {
     }
 }
 
-macro_rules! todata_rank_case {
+macro_rules! to_data_rank_case {
     ($self:tt, $self_type:tt, $const_rank:literal) => {
         match $self.kind {
             KindFlag::Float => {
@@ -267,18 +267,18 @@ impl<B: Backend> DynTensor<B> {
         let rank = self.rank();
 
         match rank {
-            1 => todata_rank_case!(self, Self, 1),
-            2 => todata_rank_case!(self, Self, 2),
-            3 => todata_rank_case!(self, Self, 3),
-            4 => todata_rank_case!(self, Self, 4),
-            5 => todata_rank_case!(self, Self, 5),
-            6 => todata_rank_case!(self, Self, 6),
-            7 => todata_rank_case!(self, Self, 7),
-            8 => todata_rank_case!(self, Self, 8),
-            9 => todata_rank_case!(self, Self, 9),
-            10 => todata_rank_case!(self, Self, 10),
-            11 => todata_rank_case!(self, Self, 11),
-            12 => todata_rank_case!(self, Self, 12),
+            1 => to_data_rank_case!(self, Self, 1),
+            2 => to_data_rank_case!(self, Self, 2),
+            3 => to_data_rank_case!(self, Self, 3),
+            4 => to_data_rank_case!(self, Self, 4),
+            5 => to_data_rank_case!(self, Self, 5),
+            6 => to_data_rank_case!(self, Self, 6),
+            7 => to_data_rank_case!(self, Self, 7),
+            8 => to_data_rank_case!(self, Self, 8),
+            9 => to_data_rank_case!(self, Self, 9),
+            10 => to_data_rank_case!(self, Self, 10),
+            11 => to_data_rank_case!(self, Self, 11),
+            12 => to_data_rank_case!(self, Self, 12),
             _ => Err(DynTensorError::UnsupportedRank {
                 msg: format!("Flatten rank ({}) is not supported", rank),
                 rank,
