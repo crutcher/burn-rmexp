@@ -25,7 +25,10 @@ doc_markdown = "warn"
 [workspace.dependencies]
 burn = "0.20.0-pre.3"
 serde = "^1"
+
+uuid = "1.18.1"
 clap = "^4.5.52"
 indicatif = "^0.18.3"
 
-tokio = { version = "1.47.1", features = ["full"] }
+tokio = "1.47.1"
+futures = "0.3.31"

@@ -2,11 +2,11 @@ use std::any::Any;
 use std::fmt::Debug;
 
 /// A trait for cloning values into a boxed form.
-pub trait CloneBoxDebugSendAny: Debug + Send + Any {
-    fn clone_box(&self) -> Box<dyn CloneBoxDebugSendAny>;
+pub trait CloneBox: 'static + Any + Debug + Send + Sync {
+    fn clone_box(&self) -> Box<dyn CloneBox>;
 }
 
-impl dyn CloneBoxDebugSendAny {
+impl dyn CloneBox {
     /// Downcasts the boxed value to a specific type.
     ///
     /// See: [`Any::downcast_ref`].
@@ -15,13 +15,13 @@ impl dyn CloneBoxDebugSendAny {
     }
 }
 
-impl<T: Clone + Debug + Send + Any> CloneBoxDebugSendAny for T {
-    fn clone_box(&self) -> Box<dyn CloneBoxDebugSendAny> {
+impl<T: 'static + Any + Debug + Clone + Send + Sync> CloneBox for T {
+    fn clone_box(&self) -> Box<dyn CloneBox> {
         Box::new(self.clone())
     }
 }
 
-impl Clone for Box<dyn CloneBoxDebugSendAny> {
+impl Clone for Box<dyn CloneBox> {
     fn clone(&self) -> Self {
         (**self).clone_box()
     }
@@ -43,9 +43,9 @@ mod tests {
 
         let source: Tensor<B, 2> = Tensor::random([2, 3], Distribution::Default, &device);
 
-        let boxed: Box<dyn CloneBoxDebugSendAny> = Box::new(source.clone());
+        let boxed: Box<dyn CloneBox> = Box::new(source.clone());
 
-        assert_send::<Box<dyn CloneBoxDebugSendAny>>();
+        assert_send::<Box<dyn CloneBox>>();
 
         let cloned_box = boxed.clone();
 

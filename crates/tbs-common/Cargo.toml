@@ -10,10 +10,13 @@ license.workspace = true
 burn = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["full", "tracing"] }
+futures = { workspace = true }
+
+uuid = { workspace = true, features = ["serde", "v4"] }
 
 [dev-dependencies]
-burn = { workspace = true, features = ["wgpu"]}
-tokio = { workspace = true, features = ["test-util"]}
+tokio = { workspace = true, features = ["test-util"] }
+burn = { workspace = true, features = ["wgpu"] }
 
 [lints]
 workspace = true

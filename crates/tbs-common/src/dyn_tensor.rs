@@ -1,4 +1,4 @@
-use crate::clone_box::CloneBoxDebugSendAny;
+use crate::clone_box::CloneBox;
 use crate::index::SlicesError;
 use crate::kind::KindFlag;
 use crate::{index, tensor_util};
@@ -23,8 +23,14 @@ pub struct DynTensor<B: Backend> {
     dtype: DType,
     kind: KindFlag,
     device: B::Device,
-    tensor: Box<dyn CloneBoxDebugSendAny>,
+    tensor: Box<dyn CloneBox>,
     phantom: std::marker::PhantomData<B>,
+}
+
+impl<B: Backend, const R: usize, K: BasicOps<B> + 'static> Into<DynTensor<B>> for Tensor<B, R, K> {
+    fn into(self) -> DynTensor<B> {
+        DynTensor::new(self)
+    }
 }
 
 impl<B: Backend> DynTensor<B> {

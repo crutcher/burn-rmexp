@@ -6,6 +6,7 @@ pub mod dyn_tensor;
 pub mod index;
 pub mod kind;
 pub mod library;
+pub mod tensor_library;
 pub mod tensor_util;
 
 /// add two numbers

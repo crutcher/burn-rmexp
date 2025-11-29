@@ -5447,8 +5447,10 @@ name = "tbs-common"
 version = "0.0.1"
 dependencies = [
  "burn",
+ "futures",
  "serde",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -6167,6 +6169,7 @@ dependencies = [
  "getrandom 0.3.4",
  "js-sys",
  "rand 0.9.2",
+ "serde",
  "wasm-bindgen",
 ]
 
