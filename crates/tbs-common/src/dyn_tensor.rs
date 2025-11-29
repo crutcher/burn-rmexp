@@ -64,6 +64,11 @@ impl<B: Backend> DynTensor<B> {
         self.shape.num_elements()
     }
 
+    /// Returns the size estimate of the tensor in bytes.
+    pub fn size_estimate(&self) -> usize {
+        self.dtype.size() * self.num_elements()
+    }
+
     /// Get the tensor data type.
     pub fn dtype(&self) -> DType {
         self.dtype
@@ -330,6 +335,11 @@ mod tests {
         assert_eq!(stub.num_elements(), 6);
 
         assert_eq!(stub.dtype(), source.dtype());
+        assert_eq!(
+            stub.size_estimate(),
+            stub.num_elements() * source.dtype().size()
+        );
+
         assert_eq!(stub.kind(), KindFlag::Float);
 
         assert_eq!(stub.device(), device);
@@ -370,6 +380,11 @@ mod tests {
         assert_eq!(stub.num_elements(), 6);
 
         assert_eq!(stub.dtype(), source.dtype());
+        assert_eq!(
+            stub.size_estimate(),
+            stub.num_elements() * source.dtype().size()
+        );
+
         assert_eq!(stub.kind(), KindFlag::Int);
 
         assert_eq!(stub.device(), device);
@@ -410,6 +425,11 @@ mod tests {
         assert_eq!(stub.num_elements(), 6);
 
         assert_eq!(stub.dtype(), source.dtype());
+        assert_eq!(
+            stub.size_estimate(),
+            stub.num_elements() * source.dtype().size()
+        );
+
         assert_eq!(stub.kind(), KindFlag::Bool);
 
         assert_eq!(stub.device(), device);

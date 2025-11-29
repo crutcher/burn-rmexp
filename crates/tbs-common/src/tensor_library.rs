@@ -12,37 +12,16 @@ pub enum TensorLibraryQuery {
     /// Query by UUID.
     Uuid(uuid::Uuid),
 
-    /// Query by path.
-    Path(Vec<String>),
+    /// Query by route.
+    Route(Vec<String>),
+
+    /// Query by string path.
+    Path(String),
 }
 
 impl From<uuid::Uuid> for TensorLibraryQuery {
     fn from(uuid: uuid::Uuid) -> Self {
         Self::Uuid(uuid)
-    }
-}
-
-impl TensorLibraryQuery {
-    fn path_from_sep<S: AsRef<str>>(
-        path: S,
-        sep: &str,
-    ) -> TensorLibraryQuery {
-        let path = path
-            .as_ref()
-            .split(sep)
-            .map(String::from)
-            .collect::<Vec<_>>();
-        TensorLibraryQuery::Path(path)
-    }
-
-    /// Parse a dotted path.
-    pub fn parse_dotted_path<S: AsRef<str>>(path: S) -> TensorLibraryQuery {
-        Self::path_from_sep(path, ".")
-    }
-
-    /// Parse a slashed path.
-    pub fn parse_slashed_path<S: AsRef<str>>(path: S) -> TensorLibraryQuery {
-        Self::path_from_sep(path, "/")
     }
 }
 
@@ -121,6 +100,7 @@ impl<B: Backend> TensorLibrary<B> for TensorLibraryCollection<B> {
     }
 }
 
+/// A [`TensorLibrary`] backed by a [`uuid::Uuid`] keyed [`HashMap`].
 #[derive(Debug, Clone)]
 pub struct UuidMapTensorLibrary<B: Backend> {
     hash_map: HashMap<uuid::Uuid, DynTensor<B>>,
@@ -135,9 +115,7 @@ impl<B: Backend> Default for UuidMapTensorLibrary<B> {
 impl<B: Backend> UuidMapTensorLibrary<B> {
     /// Create an empty library.
     pub fn empty() -> Self {
-        Self {
-            hash_map: Default::default(),
-        }
+        Self::new(Default::default())
     }
 
     /// Create a new library from a map.
@@ -189,13 +167,30 @@ impl<B: Backend> UuidMapTensorLibrary<B> {
         self.hash_map.remove(key)
     }
 
-    /// Get a tensor from the library.
-    /// Returns `None` if the tensor was not found.
-    pub fn get_clone(
+    /// Clear the library.
+    pub fn clear(&mut self) {
+        self.hash_map.clear();
+    }
+
+    /// Returns the number of tensors in the library.
+    pub fn len(&self) -> usize {
+        self.hash_map.len()
+    }
+
+    /// Returns the size estimate of the library in bytes.
+    pub fn size_estimate(&self) -> usize {
+        self.hash_map
+            .values()
+            .map(|tensor| tensor.size_estimate())
+            .sum()
+    }
+
+    /// Get a tensor ref from the library.
+    pub fn get(
         &self,
         key: &uuid::Uuid,
-    ) -> Option<DynTensor<B>> {
-        self.hash_map.get(key).cloned()
+    ) -> Option<&DynTensor<B>> {
+        self.hash_map.get(key)
     }
 }
 
@@ -208,7 +203,7 @@ impl<B: Backend> TensorLibrary<B> for UuidMapTensorLibrary<B> {
     {
         Box::pin(async move {
             match query {
-                TensorLibraryQuery::Uuid(uuid) => Ok(self.get_clone(&uuid)),
+                TensorLibraryQuery::Uuid(uuid) => Ok(self.get(&uuid).cloned()),
                 _ => Ok(None),
             }
         })
@@ -238,6 +233,20 @@ mod tests {
         );
 
         let id = library.bind(source.clone());
+
+        assert_eq!(library.len(), 1);
+        assert_eq!(
+            library.size_estimate(),
+            1 * source.shape().num_elements() * source.dtype().size()
+        );
+
+        let _dup = library.bind(source.clone());
+
+        assert_eq!(library.len(), 2);
+        assert_eq!(
+            library.size_estimate(),
+            2 * source.shape().num_elements() * source.dtype().size()
+        );
 
         let dyn_tensor = library
             .query(id.into())
