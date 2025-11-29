@@ -40,14 +40,19 @@ impl<B: Backend> DynTensor<B> {
         }
     }
 
+    /// Get the tensor rank.
+    pub fn rank(&self) -> usize {
+        self.shape.rank()
+    }
+
     /// Get the tensor shape.
     pub fn shape(&self) -> Shape {
         self.shape.clone()
     }
 
-    /// Get the tensor rank.
-    pub fn rank(&self) -> usize {
-        self.shape.rank()
+    /// Get the number of elements in the tensor.
+    pub fn num_elements(&self) -> usize {
+        self.shape.num_elements()
     }
 
     /// Get the tensor data type.
@@ -311,8 +316,9 @@ mod tests {
 
         let stub = DynTensor::new(source.clone());
 
-        assert_eq!(stub.shape(), source.shape());
         assert_eq!(stub.rank(), 2);
+        assert_eq!(stub.shape(), source.shape());
+        assert_eq!(stub.num_elements(), 6);
 
         assert_eq!(stub.dtype(), source.dtype());
         assert_eq!(stub.kind(), KindFlag::Float);
@@ -350,8 +356,9 @@ mod tests {
 
         let stub = DynTensor::new(source.clone());
 
-        assert_eq!(stub.shape(), source.shape());
         assert_eq!(stub.rank(), 2);
+        assert_eq!(stub.shape(), source.shape());
+        assert_eq!(stub.num_elements(), 6);
 
         assert_eq!(stub.dtype(), source.dtype());
         assert_eq!(stub.kind(), KindFlag::Int);
@@ -389,8 +396,9 @@ mod tests {
 
         let stub = DynTensor::new(source.clone());
 
-        assert_eq!(stub.shape(), source.shape());
         assert_eq!(stub.rank(), 2);
+        assert_eq!(stub.shape(), source.shape());
+        assert_eq!(stub.num_elements(), 6);
 
         assert_eq!(stub.dtype(), source.dtype());
         assert_eq!(stub.kind(), KindFlag::Bool);
