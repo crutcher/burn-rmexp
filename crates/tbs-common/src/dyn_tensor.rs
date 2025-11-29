@@ -139,7 +139,7 @@ impl<B: Backend> DynTensor<B> {
             11 => slice_rank_case!(self, Self, 11, slices),
             12 => slice_rank_case!(self, Self, 12, slices),
             _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("Selection rank {} is not supported", R),
+                msg: format!("slice rank ({}) is not supported", R),
                 rank,
             }),
         }
@@ -191,7 +191,7 @@ impl<B: Backend> DynTensor<B> {
             11 => dyn_slice_rank_case!(self, Self, 11, slices),
             12 => dyn_slice_rank_case!(self, Self, 12, slices),
             _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("Selection rank ({}) is not supported", rank),
+                msg: format!("slice rank ({}) is not supported", rank),
                 rank,
             }),
         }
@@ -238,7 +238,7 @@ impl<B: Backend> DynTensor<B> {
             11 => flatten_rank_case!(self, Self, 11),
             12 => flatten_rank_case!(self, Self, 12),
             _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("Flatten rank ({}) is not supported", rank),
+                msg: format!("flatten rank ({}) is not supported", rank),
                 rank,
             }),
         }
@@ -285,7 +285,7 @@ impl<B: Backend> DynTensor<B> {
             11 => to_data_rank_case!(self, Self, 11),
             12 => to_data_rank_case!(self, Self, 12),
             _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("Flatten rank ({}) is not supported", rank),
+                msg: format!("to_data rank ({}) is not supported", rank),
                 rank,
             }),
         }
