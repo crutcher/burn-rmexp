@@ -1,12 +1,11 @@
 //! # Tensor Provider
 
+use crate::library::metadata;
 use burn::Tensor;
 use burn::prelude::{Backend, Bool, Float, Int};
 use burn::tensor::{BasicOps, Slice, TensorData, TensorKind};
 use std::any::Any;
 use std::future::Future;
-
-pub mod metadata;
 
 #[derive(Debug, Clone)]
 pub enum FlatTensorWrapper<B: Backend> {
@@ -39,7 +38,7 @@ pub enum TensorProviderError {
     InternalError,
 }
 
-pub trait TensorProvider<B: Backend> {
+pub trait DynTensorProvider<B: Backend> {
     fn typed_shape(&self) -> metadata::TypedShape;
 
     fn get_slice_data(
@@ -53,7 +52,7 @@ pub trait TensorProvider<B: Backend> {
     ) -> impl Future<Output = Result<FlatTensorWrapper<B>, TensorProviderError>> + Send;
 }
 
-pub struct ConstantTensorProvider<B, const D: usize, K>
+pub struct ConstantDynProvider<B, const D: usize, K>
 where
     B: Backend,
     K: BasicOps<B>,
@@ -61,7 +60,7 @@ where
     pub tensor: Tensor<B, D, K>,
 }
 
-impl<B, const D: usize, K> ConstantTensorProvider<B, D, K>
+impl<B, const D: usize, K> ConstantDynProvider<B, D, K>
 where
     B: Backend,
     K: BasicOps<B>,
@@ -80,7 +79,7 @@ where
     tensor.reshape([num_elem])
 }
 
-impl<B, const D: usize, K> TensorProvider<B> for ConstantTensorProvider<B, D, K>
+impl<B, const D: usize, K> DynTensorProvider<B> for ConstantDynProvider<B, D, K>
 where
     B: Backend,
     K: BasicOps<B>,

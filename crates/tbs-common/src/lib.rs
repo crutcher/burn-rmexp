@@ -1,6 +1,12 @@
 //! # Tokio-Block-Stream Common
 
-pub mod tensor_provider;
+pub mod clone_box;
+pub mod dyn_provider;
+pub mod dyn_tensor;
+pub mod index;
+pub mod kind;
+pub mod library;
+pub mod tensor_util;
 
 /// add two numbers
 pub fn add(
