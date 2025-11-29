@@ -9,7 +9,10 @@ use burn::tensor::{BasicOps, DType, Slice};
 /// [`DynTensor`] accessor errors.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DynTensorError {
+    /// An error occurred while slicing.
     SliceError(SlicesError),
+
+    /// The tensor rank is not supported for the requested operation.
     UnsupportedRank { msg: String, rank: usize },
 }
 
