@@ -183,7 +183,7 @@ impl<B: Backend> DynTensor<B> {
     /// A dynamic version of [`DynTensor::slice`].
     ///
     /// Generated up to rank 12.
-    pub fn dyn_slice(
+    pub fn slice_dyn(
         &self,
         slices: &[Slice],
     ) -> Result<Self, DynTensorError> {
@@ -491,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dyn_slice() {
+    fn test_slice_dyn() {
         type B = Wgpu;
         let device = Default::default();
 
@@ -500,7 +500,7 @@ mod tests {
         let stub = DynTensor::new(source.clone());
 
         let slice = stub
-            .dyn_slice(&vec![Slice::new(0, None, 1), Slice::new(1, None, 1)])
+            .slice_dyn(&vec![Slice::new(0, None, 1), Slice::new(1, None, 1)])
             .unwrap();
         assert_eq!(slice.shape(), [2, 2].into());
         slice
