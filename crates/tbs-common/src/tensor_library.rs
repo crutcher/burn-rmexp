@@ -34,7 +34,7 @@ pub enum TensorLibraryError {
 pub trait TensorLibrary<B: Backend>: 'static + Debug {
     /// Query a tensor from the library.
     fn query<'a>(
-        &'a self,
+        &'a mut self,
         query: TensorLibraryQuery,
     ) -> Pin<Box<dyn Future<Output = Result<Option<DynTensor<B>>, TensorLibraryError>> + Send + 'a>>;
 }
@@ -77,14 +77,14 @@ impl<B: Backend> TensorLibraryCollection<B> {
 
 impl<B: Backend> TensorLibrary<B> for TensorLibraryCollection<B> {
     fn query<'a>(
-        &'a self,
+        &'a mut self,
         query: TensorLibraryQuery,
     ) -> Pin<Box<dyn Future<Output = Result<Option<DynTensor<B>>, TensorLibraryError>> + Send + 'a>>
     {
         // Query each library in parallel.
         let fs = self
             .libs
-            .iter()
+            .iter_mut()
             .map(|lib| lib.query(query.clone()))
             .collect::<Vec<_>>();
 
@@ -106,21 +106,24 @@ pub struct UuidMapTensorLibrary<B: Backend> {
     hash_map: HashMap<uuid::Uuid, DynTensor<B>>,
 }
 
+impl<B: Backend> From<HashMap<uuid::Uuid, DynTensor<B>>> for UuidMapTensorLibrary<B> {
+    fn from(hash_map: HashMap<uuid::Uuid, DynTensor<B>>) -> Self {
+        Self { hash_map }
+    }
+}
+
 impl<B: Backend> Default for UuidMapTensorLibrary<B> {
     fn default() -> Self {
-        Self::empty()
+        Self::new()
     }
 }
 
 impl<B: Backend> UuidMapTensorLibrary<B> {
     /// Create an empty library.
-    pub fn empty() -> Self {
-        Self::new(Default::default())
-    }
-
-    /// Create a new library from a map.
-    pub fn new(map: HashMap<uuid::Uuid, DynTensor<B>>) -> Self {
-        Self { hash_map: map }
+    pub fn new() -> Self {
+        Self {
+            hash_map: HashMap::new(),
+        }
     }
 
     /// Get a reference to the internal map.
@@ -197,7 +200,7 @@ impl<B: Backend> UuidMapTensorLibrary<B> {
 impl<B: Backend> TensorLibrary<B> for UuidMapTensorLibrary<B> {
     /// Query a tensor from the library.
     fn query<'a>(
-        &'a self,
+        &'a mut self,
         query: TensorLibraryQuery,
     ) -> Pin<Box<dyn Future<Output = Result<Option<DynTensor<B>>, TensorLibraryError>> + Send + 'a>>
     {
@@ -210,17 +213,86 @@ impl<B: Backend> TensorLibrary<B> for UuidMapTensorLibrary<B> {
     }
 }
 
+pub trait LazyBuilder<B: Backend>: Debug + Sync + Send + 'static {
+    fn build<'a>(
+        &'a self,
+        query: TensorLibraryQuery,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<DynTensor<B>>, TensorLibraryError>> + Send + 'a>>;
+}
+
+#[derive(Debug, Default)]
+pub struct LazyBuilderLibrary<B: Backend> {
+    builders: HashMap<uuid::Uuid, Box<dyn LazyBuilder<B>>>,
+    cached: UuidMapTensorLibrary<B>,
+}
+
+impl<B: Backend> LazyBuilderLibrary<B> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn cached(&self) -> &UuidMapTensorLibrary<B> {
+        &self.cached
+    }
+
+    pub fn cached_mut(&mut self) -> &mut UuidMapTensorLibrary<B> {
+        &mut self.cached
+    }
+
+    pub fn register_builder<T: LazyBuilder<B> + 'static>(
+        &mut self,
+        uuid: uuid::Uuid,
+        builder: T,
+    ) {
+        self.builders.insert(uuid, Box::new(builder));
+    }
+}
+
+impl<B: Backend> TensorLibrary<B> for LazyBuilderLibrary<B> {
+    fn query<'a>(
+        &'a mut self,
+        query: TensorLibraryQuery,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<DynTensor<B>>, TensorLibraryError>> + Send + 'a>>
+    {
+        Box::pin(async move {
+            match query {
+                TensorLibraryQuery::Uuid(uuid) => {
+                    if let Some(tensor) = self.cached.get(&uuid).cloned() {
+                        return Ok(Some(tensor));
+                    }
+
+                    let builder = self.builders.get(&uuid);
+                    if builder.is_none() {
+                        return Ok(None);
+                    }
+
+                    let qr = builder.unwrap().build(query.clone()).await?;
+                    if qr.is_some() {
+                        self.cached.insert(uuid, qr.as_ref().unwrap().clone());
+                    }
+                    Ok(qr)
+                }
+                _ => Ok(None),
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::kind::KindFlag;
     use burn::Tensor;
     use burn::backend::Wgpu;
+    use burn::backend::wgpu::WgpuDevice;
+    use burn::prelude::Shape;
+
     #[tokio::test]
     async fn test_map_library() {
         type B = Wgpu;
         let device = Default::default();
 
-        let mut library = UuidMapTensorLibrary::empty();
+        let mut library = UuidMapTensorLibrary::new();
 
         let source: Tensor<B, 2> = Tensor::random([2, 3], Default::default(), &device);
 
@@ -258,5 +330,64 @@ mod tests {
             .to_data()
             .unwrap()
             .assert_eq(&source.to_data(), true);
+    }
+
+    #[tokio::test]
+    async fn test_lazy_builder_library() {
+        type B = Wgpu;
+        let device: WgpuDevice = Default::default();
+
+        #[derive(Debug)]
+        struct RandomBuilder<B: Backend, const R: usize> {
+            pub shape: [usize; R],
+            pub device: B::Device,
+        }
+
+        impl<B: Backend, const R: usize> LazyBuilder<B> for RandomBuilder<B, R> {
+            fn build<'a>(
+                &'a self,
+                _query: TensorLibraryQuery,
+            ) -> Pin<
+                Box<
+                    dyn Future<Output = Result<Option<DynTensor<B>>, TensorLibraryError>>
+                        + Send
+                        + 'a,
+                >,
+            > {
+                Box::pin(async move {
+                    Ok(Some(
+                        Tensor::<B, R>::random(
+                            self.shape.clone(),
+                            Default::default(),
+                            &self.device,
+                        )
+                        .into(),
+                    ))
+                })
+            }
+        }
+
+        let mut library: LazyBuilderLibrary<B> = LazyBuilderLibrary::new();
+        let id = uuid::Uuid::new_v4();
+
+        library.register_builder(
+            id,
+            RandomBuilder {
+                shape: [2, 3],
+                device: device.clone(),
+            },
+        );
+
+        let dyn_tensor = library
+            .query(id.into())
+            .await
+            .expect("query failed")
+            .expect("tensor not found");
+
+        assert_eq!(dyn_tensor.rank(), 2);
+        assert_eq!(dyn_tensor.shape(), Shape::new([2, 3]));
+
+        assert_eq!(dyn_tensor.kind(), KindFlag::Float);
+        assert_eq!(dyn_tensor.device(), device);
     }
 }
