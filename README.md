@@ -1,2 +1,3 @@
-# tokio-block-stream-benchtop
-benchtop demo for block transfer stream client/server stack in tokio
+# burn-rmexp
+
+Benchtop experiments for extending [burn](https://github.com/tracel-ai/burn) remoting capabilities.
