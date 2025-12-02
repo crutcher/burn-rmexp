@@ -9,7 +9,7 @@ pub trait CloneBox: 'static + Any + Debug + Send + Sync {
 impl dyn CloneBox {
     /// Downcasts the boxed value to a specific type.
     ///
-    /// See: [`Any::downcast_ref`].
+    /// See: `Any::downcast_ref`.
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         (self as &dyn Any).downcast_ref::<T>()
     }

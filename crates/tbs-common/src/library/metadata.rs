@@ -4,7 +4,7 @@ use burn::prelude::Shape;
 use burn::tensor::DType;
 use serde::{Deserialize, Serialize};
 
-/// A Serializable [`burn::prelude::TensorMetadata`]
+/// A Serializable `burn::prelude::TensorMetadata`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TypedShape {
     /// The data type of the tensor.

@@ -19,6 +19,186 @@ pub enum DynTensorError {
     UnsupportedRank { msg: String, rank: usize },
 }
 
+macro_rules! cast_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $dtype:tt) => {{
+        let target_kind: KindFlag = $dtype.into();
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                Ok(match target_kind {
+                    KindFlag::Float => $self_type::new(tensor.cast($dtype)),
+                    KindFlag::Int => $self_type::new(tensor.int().cast($dtype)),
+                    KindFlag::Bool => $self_type::new(tensor.bool()),
+                })
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                Ok(match target_kind {
+                    KindFlag::Float => $self_type::new(tensor.float().cast($dtype)),
+                    KindFlag::Int => $self_type::new(tensor.cast($dtype)),
+                    KindFlag::Bool => $self_type::new(tensor.bool()),
+                })
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
+                Ok(match target_kind {
+                    KindFlag::Float => $self_type::new(tensor.float().cast($dtype)),
+                    KindFlag::Int => $self_type::new(tensor.int().cast($dtype)),
+                    KindFlag::Bool => $self,
+                })
+            }
+        }
+    }};
+}
+
+macro_rules! slice_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $( $slices:tt ),*) => {
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                Ok($self_type::new(tensor.slice($($slices)*)))
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                Ok($self_type::new(tensor.slice($($slices)*)))
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
+                Ok($self_type::new(tensor.slice($($slices)*)))
+            }
+        }
+    };
+}
+
+macro_rules! slice_dyn_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt) => {
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
+                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
+            }
+        }
+    };
+}
+
+macro_rules! slice_assign_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt, $values:tt) => {
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                let values: Tensor<B, $const_rank, Float> = $values.downcast_clone().unwrap();
+                let values = values.cast(tensor.dtype());
+                Ok($self_type::new(tensor.slice_assign($slices, values)))
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                let values: Tensor<B, $const_rank, Int> = $values.downcast_clone().unwrap();
+                let values = values.cast(tensor.dtype());
+                Ok($self_type::new(tensor.slice_assign($slices, values)))
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
+                let values: Tensor<B, $const_rank, Bool> = $values.downcast_clone().unwrap();
+                Ok($self_type::new(tensor.slice_assign($slices, values)))
+            }
+        }
+    };
+}
+
+macro_rules! slice_assign_dyn_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt, $values:tt) => {{
+        let slices: [Slice; $const_rank] = $slices.try_into().unwrap();
+        $self.slice_assign(slices, $values)
+    }};
+}
+
+macro_rules! flatten_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal) => {
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                Ok($self_type::new(tensor.flatten::<1>(0, $self.rank() - 1)))
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                Ok($self_type::new(tensor.flatten::<1>(0, $self.rank() - 1)))
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
+                Ok($self_type::new(tensor.flatten::<1>(0, $self.rank() - 1)))
+            }
+        }
+    };
+}
+
+macro_rules! to_device_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $device:tt) => {
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                let tensor = tensor.to_device($device);
+                Ok($self_type::new(tensor))
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                let tensor = tensor.to_device($device);
+                Ok($self_type::new(tensor))
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
+                let tensor = tensor.to_device($device);
+                Ok($self_type::new(tensor))
+            }
+        }
+    };
+}
+
+macro_rules! from_data_rank_case {
+    ($const_rank:literal, $data:tt, $kind:tt, $device:tt) => {
+        match $kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = Tensor::from_data($data, $device);
+                Ok(tensor.to_data())
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = Tensor::from_data($data, $device);
+                Ok(tensor.to_data())
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = Tensor::from_data($data, $device);
+                Ok(tensor.to_data())
+            }
+        }
+    };
+}
+
+macro_rules! to_data_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal) => {
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                Ok(tensor.to_data())
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                Ok(tensor.to_data())
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
+                Ok(tensor.to_data())
+            }
+        }
+    };
+}
+
 /// A dynamic [`Tensor`] wrapper that can be sliced.
 #[derive(Debug, Clone)]
 pub struct DynTensor<B: Backend> {
@@ -98,28 +278,7 @@ impl<B: Backend> DynTensor<B> {
     {
         self.tensor.downcast_ref::<Tensor<B, R, K>>().cloned()
     }
-}
 
-macro_rules! slice_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $( $slices:tt ),*) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice($($slices)*)))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice($($slices)*)))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice($($slices)*)))
-            }
-        }
-    };
-}
-
-impl<B: Backend> DynTensor<B> {
     /// Slice the stub tensor.
     ///
     /// Generated up to rank 12.
@@ -161,28 +320,7 @@ impl<B: Backend> DynTensor<B> {
             }),
         }
     }
-}
 
-macro_rules! slice_dyn_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
-            }
-        }
-    };
-}
-
-impl<B: Backend> DynTensor<B> {
     /// A dynamic version of [`DynTensor::slice`].
     ///
     /// Generated up to rank 12.
@@ -213,40 +351,7 @@ impl<B: Backend> DynTensor<B> {
             }),
         }
     }
-}
 
-macro_rules! slice_assign_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt, $values:tt) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                let values: Tensor<B, $const_rank, Float> = $values.downcast_clone().unwrap();
-                let values = values.cast(tensor.dtype());
-                Ok($self_type::new(tensor.slice_assign($slices, values)))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                let values: Tensor<B, $const_rank, Int> = $values.downcast_clone().unwrap();
-                let values = values.cast(tensor.dtype());
-                Ok($self_type::new(tensor.slice_assign($slices, values)))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                let values: Tensor<B, $const_rank, Bool> = $values.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice_assign($slices, values)))
-            }
-        }
-    };
-}
-
-macro_rules! slice_assign_dyn_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt, $values:tt) => {{
-        let slices: [Slice; $const_rank] = $slices.try_into().unwrap();
-        $self.slice_assign(slices, $values)
-    }};
-}
-
-impl<B: Backend> DynTensor<B> {
     /// Assign values to a slice.
     ///
     /// Generated up to rank 12.
@@ -329,28 +434,7 @@ impl<B: Backend> DynTensor<B> {
             }),
         }
     }
-}
 
-macro_rules! flatten_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.flatten::<1>(0, $self.rank() - 1)))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.flatten::<1>(0, $self.rank() - 1)))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.flatten::<1>(0, $self.rank() - 1)))
-            }
-        }
-    };
-}
-
-impl<B: Backend> DynTensor<B> {
     /// Flatten the tensor.
     ///
     /// Generated up to rank 12.
@@ -376,27 +460,7 @@ impl<B: Backend> DynTensor<B> {
             }),
         }
     }
-}
 
-macro_rules! cast_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $dtype:tt) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                let tensor = tensor.cast($dtype);
-                Ok($self_type::new(tensor))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                let tensor = tensor.cast($dtype);
-                Ok($self_type::new(tensor))
-            }
-            KindFlag::Bool => Ok($self),
-        }
-    };
-}
-
-impl<B: Backend> DynTensor<B> {
     /// Cast the tensor.
     ///
     /// Generated up to rank 12.
@@ -405,13 +469,6 @@ impl<B: Backend> DynTensor<B> {
         dtype: DType,
     ) -> Result<Self, DynTensorError> {
         let rank = self.rank();
-        let cast_kind: KindFlag = dtype.into();
-
-        if cast_kind == self.kind {
-            return Err(DynTensorError::InvalidArgument {
-                msg: format!("casting to same dtype ({:?})", dtype),
-            });
-        }
 
         match rank {
             1 => cast_rank_case!(self, Self, 1, dtype),
@@ -432,30 +489,7 @@ impl<B: Backend> DynTensor<B> {
             }),
         }
     }
-}
-macro_rules! to_device_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $device:tt) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                let tensor = tensor.to_device($device);
-                Ok($self_type::new(tensor))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                let tensor = tensor.to_device($device);
-                Ok($self_type::new(tensor))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                let tensor = tensor.to_device($device);
-                Ok($self_type::new(tensor))
-            }
-        }
-    };
-}
 
-impl<B: Backend> DynTensor<B> {
     /// Move the tensor to the given device.
     ///
     /// Generated up to rank 12.
@@ -487,27 +521,7 @@ impl<B: Backend> DynTensor<B> {
             }),
         }
     }
-}
-macro_rules! from_data_rank_case {
-    ($const_rank:literal, $data:tt, $kind:tt, $device:tt) => {
-        match $kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = Tensor::from_data($data, $device);
-                Ok(tensor.to_data())
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = Tensor::from_data($data, $device);
-                Ok(tensor.to_data())
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = Tensor::from_data($data, $device);
-                Ok(tensor.to_data())
-            }
-        }
-    };
-}
 
-impl<B: Backend> DynTensor<B> {
     /// Convert a [`TensorData`] to a [`DynTensor`].
     ///
     /// Generated up to rank 12.
@@ -537,28 +551,7 @@ impl<B: Backend> DynTensor<B> {
             }),
         }
     }
-}
 
-macro_rules! to_data_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok(tensor.to_data())
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok(tensor.to_data())
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok(tensor.to_data())
-            }
-        }
-    };
-}
-
-impl<B: Backend> DynTensor<B> {
     /// Convert the tensor to a [`TensorData`].
     ///
     /// Generated up to rank 12.
