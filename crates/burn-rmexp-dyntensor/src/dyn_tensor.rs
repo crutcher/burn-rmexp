@@ -20,11 +20,13 @@ pub enum DynTensorError {
     UnsupportedRank { msg: String, rank: usize },
 }
 
+/// Dynamic to static rank dispatch handler.
 trait RankHandler {
     type Output;
     fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError>;
 }
 
+/// Dynamic rank dispatch.
 fn dispatch_rank<H: RankHandler>(
     rank: usize,
     handler: H,
@@ -49,9 +51,27 @@ fn dispatch_rank<H: RankHandler>(
     }
 }
 
+/// Values conversion trait for [`DynTensor::slice_assign`].
+#[derive(Debug, Clone)]
 pub enum ValuesArg<B: Backend> {
+    /// A [`DynTensor`] wrapper.
     Dyn(DynTensor<B>),
+
+    /// A [`TensorData`] wrapper.
     Data(TensorData),
+}
+
+impl<B: Backend> ValuesArg<B> {
+    /// Convert to a [`DynTensor`] on a given device.
+    fn to_dyn_device(
+        self,
+        device: &B::Device,
+    ) -> Result<DynTensor<B>, DynTensorError> {
+        match self {
+            ValuesArg::Dyn(val) => val.to_device(device),
+            ValuesArg::Data(val) => DynTensor::from_data(val, device),
+        }
+    }
 }
 
 impl<B: Backend> From<DynTensor<B>> for ValuesArg<B> {
@@ -264,10 +284,7 @@ impl<B: Backend> DynTensor<B> {
     {
         let rank = self.rank();
         let slices = self.shape().into_slices(slices);
-        let values: DynTensor<B> = match values.into() {
-            ValuesArg::Dyn(values) => values,
-            ValuesArg::Data(values) => DynTensor::from_data(values, &self.device())?,
-        };
+        let values: DynTensor<B> = values.into().to_dyn_device(&self.device())?;
 
         indexing::check_slices_bounds(&self.shape(), &slices)
             .map_err(DynTensorError::SliceError)?;
@@ -282,7 +299,7 @@ impl<B: Backend> DynTensor<B> {
             });
         }
 
-        let values = values.cast(self.dtype())?.to_device(&self.device())?;
+        let values = values.cast(self.dtype())?;
 
         // TODO: check that slices shape == source.shape
 
