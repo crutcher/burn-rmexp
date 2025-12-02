@@ -183,7 +183,7 @@ impl<B: Backend> DynTensor<B> {
     ///
     /// A sliced `TensorStub`, or an error.
     pub fn slice<const R: usize, S>(
-        &self,
+        self,
         slices: S,
     ) -> Result<Self, DynTensorError>
     where
@@ -195,11 +195,11 @@ impl<B: Backend> DynTensor<B> {
         indexing::check_slices_bounds(&self.shape(), &slices)
             .map_err(DynTensorError::SliceError)?;
 
-        struct SliceHandler<'a, B: Backend, const R: usize> {
-            tensor: &'a DynTensor<B>,
+        struct SliceHandler<B: Backend, const R: usize> {
+            tensor: DynTensor<B>,
             slices: [Slice; R],
         }
-        impl<'a, B: Backend, const R: usize> RankHandler for SliceHandler<'a, B, R> {
+        impl<'a, B: Backend, const R: usize> RankHandler for SliceHandler<B, R> {
             type Output = DynTensor<B>;
             fn call<const R2: usize>(self) -> Result<Self::Output, DynTensorError> {
                 match self.tensor.kind {
@@ -231,7 +231,7 @@ impl<B: Backend> DynTensor<B> {
     ///
     /// Generated up to rank 12.
     pub fn slice_dyn(
-        &self,
+        self,
         slices: &[Slice],
     ) -> Result<Self, DynTensorError> {
         let rank = self.rank();
@@ -239,7 +239,7 @@ impl<B: Backend> DynTensor<B> {
         indexing::check_slices_bounds(&self.shape(), slices).map_err(DynTensorError::SliceError)?;
 
         struct SliceDynHandler<'a, B: Backend> {
-            tensor: &'a DynTensor<B>,
+            tensor: DynTensor<B>,
             slices: &'a [Slice],
         }
         impl<'a, B: Backend> RankHandler for SliceDynHandler<'a, B> {
@@ -274,7 +274,7 @@ impl<B: Backend> DynTensor<B> {
     ///
     /// Generated up to rank 12.
     pub fn slice_assign<const R2: usize, S, V>(
-        &self,
+        self,
         slices: S,
         values: V,
     ) -> Result<Self, DynTensorError>
@@ -344,7 +344,7 @@ impl<B: Backend> DynTensor<B> {
     ///
     /// Generated up to rank=12.
     pub fn slice_assign_dyn<V>(
-        &self,
+        self,
         slices: &[Slice],
         values: V,
     ) -> Result<Self, DynTensorError>
@@ -352,7 +352,7 @@ impl<B: Backend> DynTensor<B> {
         V: Into<ValuesArg<B>>,
     {
         struct SliceAssignDynHandler<'a, B: Backend> {
-            tensor: &'a DynTensor<B>,
+            tensor: DynTensor<B>,
             slices: &'a [Slice],
             values: ValuesArg<B>,
         }
