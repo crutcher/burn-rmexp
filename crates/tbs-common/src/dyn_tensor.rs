@@ -95,13 +95,11 @@ macro_rules! slice_assign_rank_case {
             KindFlag::Float => {
                 let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
                 let values: Tensor<B, $const_rank, Float> = $values.downcast_clone().unwrap();
-                let values = values.cast(tensor.dtype());
                 Ok($self_type::new(tensor.slice_assign($slices, values)))
             }
             KindFlag::Int => {
                 let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
                 let values: Tensor<B, $const_rank, Int> = $values.downcast_clone().unwrap();
-                let values = values.cast(tensor.dtype());
                 Ok($self_type::new(tensor.slice_assign($slices, values)))
             }
             KindFlag::Bool => {
@@ -166,15 +164,15 @@ macro_rules! from_data_rank_case {
         match $kind {
             KindFlag::Float => {
                 let tensor: Tensor<B, $const_rank, Float> = Tensor::from_data($data, $device);
-                Ok(tensor.to_data())
+                Ok(DynTensor::new(tensor))
             }
             KindFlag::Int => {
                 let tensor: Tensor<B, $const_rank, Int> = Tensor::from_data($data, $device);
-                Ok(tensor.to_data())
+                Ok(DynTensor::new(tensor))
             }
             KindFlag::Bool => {
                 let tensor: Tensor<B, $const_rank, Bool> = Tensor::from_data($data, $device);
-                Ok(tensor.to_data())
+                Ok(DynTensor::new(tensor))
             }
         }
     };
@@ -197,6 +195,29 @@ macro_rules! to_data_rank_case {
             }
         }
     };
+}
+
+pub enum ValuesArg<B: Backend> {
+    Dyn(DynTensor<B>),
+    Data(TensorData),
+}
+
+impl<B: Backend> Into<ValuesArg<B>> for DynTensor<B> {
+    fn into(self) -> ValuesArg<B> {
+        ValuesArg::Dyn(self)
+    }
+}
+
+impl<B: Backend> Into<ValuesArg<B>> for TensorData {
+    fn into(self) -> ValuesArg<B> {
+        ValuesArg::Data(self)
+    }
+}
+
+impl<B: Backend, const R: usize, K: BasicOps<B> + 'static> Into<ValuesArg<B>> for Tensor<B, R, K> {
+    fn into(self) -> ValuesArg<B> {
+        ValuesArg::Dyn(DynTensor::new(self))
+    }
 }
 
 /// A dynamic [`Tensor`] wrapper that can be sliced.
@@ -362,11 +383,14 @@ impl<B: Backend> DynTensor<B> {
     ) -> Result<Self, DynTensorError>
     where
         S: SliceArg<R2>,
-        V: Into<DynTensor<B>>,
+        V: Into<ValuesArg<B>>,
     {
         let rank = self.rank();
         let slices = self.shape().into_slices(slices);
-        let values: DynTensor<B> = values.into();
+        let values: DynTensor<B> = match values.into() {
+            ValuesArg::Dyn(values) => values,
+            ValuesArg::Data(values) => DynTensor::from_data(values, &self.device())?,
+        };
 
         index::check_slices_bounds(&self.shape(), &slices).map_err(DynTensorError::SliceError)?;
 
@@ -379,6 +403,8 @@ impl<B: Backend> DynTensor<B> {
                 ),
             });
         }
+
+        let values = values.cast(self.dtype())?.to_device(&self.device())?;
 
         // TODO: check that slices shape == source.shape
 
@@ -411,7 +437,7 @@ impl<B: Backend> DynTensor<B> {
         values: V,
     ) -> Result<Self, DynTensorError>
     where
-        V: Into<DynTensor<B>>,
+        V: Into<ValuesArg<B>>,
     {
         let s_rank = slices.len();
 
@@ -528,7 +554,7 @@ impl<B: Backend> DynTensor<B> {
     pub fn from_data(
         data: TensorData,
         device: &B::Device,
-    ) -> Result<TensorData, DynTensorError> {
+    ) -> Result<Self, DynTensorError> {
         let rank = data.rank();
         let kind: KindFlag = data.dtype.into();
 
