@@ -1,4 +1,7 @@
-//! # DynTensor - Dynamically Typed burn Tensors
+//! # `DynTensor` - Dynamically Typed burn Tensors
+
+extern crate core;
+
 pub mod clone_box;
 pub mod indexing;
 pub mod operations;

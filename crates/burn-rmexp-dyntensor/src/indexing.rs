@@ -128,7 +128,7 @@ pub fn check_slices_bounds(
             return Err(SlicesError::OutOfBounds {
                 msg: format!(
                     "Slices [{}] out of bounds for tensor shape {}",
-                    format_slice_list(&slices),
+                    format_slice_list(slices),
                     format_shape(shape)
                 ),
                 shape: shape.clone(),

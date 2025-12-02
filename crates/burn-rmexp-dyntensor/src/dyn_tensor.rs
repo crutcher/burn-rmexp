@@ -20,182 +20,33 @@ pub enum DynTensorError {
     UnsupportedRank { msg: String, rank: usize },
 }
 
-macro_rules! cast_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $dtype:tt) => {{
-        let target_kind: KindFlag = $dtype.into();
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok(match target_kind {
-                    KindFlag::Float => $self_type::new(tensor.cast($dtype)),
-                    KindFlag::Int => $self_type::new(tensor.int().cast($dtype)),
-                    KindFlag::Bool => $self_type::new(tensor.bool()),
-                })
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok(match target_kind {
-                    KindFlag::Float => $self_type::new(tensor.float().cast($dtype)),
-                    KindFlag::Int => $self_type::new(tensor.cast($dtype)),
-                    KindFlag::Bool => $self_type::new(tensor.bool()),
-                })
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok(match target_kind {
-                    KindFlag::Float => $self_type::new(tensor.float().cast($dtype)),
-                    KindFlag::Int => $self_type::new(tensor.int().cast($dtype)),
-                    KindFlag::Bool => $self,
-                })
-            }
-        }
-    }};
+trait RankHandler {
+    type Output;
+    fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError>;
 }
 
-macro_rules! slice_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $( $slices:tt ),*) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice($($slices)*)))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice($($slices)*)))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice($($slices)*)))
-            }
-        }
-    };
-}
-
-macro_rules! slice_dyn_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(operations::slice_dyn(tensor, $slices)))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(operations::slice_dyn(tensor, $slices)))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(operations::slice_dyn(tensor, $slices)))
-            }
-        }
-    };
-}
-
-macro_rules! slice_assign_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt, $values:tt) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                let values: Tensor<B, $const_rank, Float> = $values.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice_assign($slices, values)))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                let values: Tensor<B, $const_rank, Int> = $values.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice_assign($slices, values)))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                let values: Tensor<B, $const_rank, Bool> = $values.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.slice_assign($slices, values)))
-            }
-        }
-    };
-}
-
-macro_rules! slice_assign_dyn_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt, $values:tt) => {{
-        let slices: [Slice; $const_rank] = $slices.try_into().unwrap();
-        $self.slice_assign(slices, $values)
-    }};
-}
-
-macro_rules! flatten_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.flatten::<1>(0, $self.rank() - 1)))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.flatten::<1>(0, $self.rank() - 1)))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor.flatten::<1>(0, $self.rank() - 1)))
-            }
-        }
-    };
-}
-
-macro_rules! to_device_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal, $device:tt) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                let tensor = tensor.to_device($device);
-                Ok($self_type::new(tensor))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                let tensor = tensor.to_device($device);
-                Ok($self_type::new(tensor))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                let tensor = tensor.to_device($device);
-                Ok($self_type::new(tensor))
-            }
-        }
-    };
-}
-
-macro_rules! from_data_rank_case {
-    ($const_rank:literal, $data:tt, $kind:tt, $device:tt) => {
-        match $kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = Tensor::from_data($data, $device);
-                Ok(DynTensor::new(tensor))
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = Tensor::from_data($data, $device);
-                Ok(DynTensor::new(tensor))
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = Tensor::from_data($data, $device);
-                Ok(DynTensor::new(tensor))
-            }
-        }
-    };
-}
-
-macro_rules! to_data_rank_case {
-    ($self:tt, $self_type:tt, $const_rank:literal) => {
-        match $self.kind {
-            KindFlag::Float => {
-                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok(tensor.to_data())
-            }
-            KindFlag::Int => {
-                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok(tensor.to_data())
-            }
-            KindFlag::Bool => {
-                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok(tensor.to_data())
-            }
-        }
-    };
+fn dispatch_rank<H: RankHandler>(
+    rank: usize,
+    handler: H,
+) -> Result<H::Output, DynTensorError> {
+    match rank {
+        1 => handler.call::<1>(),
+        2 => handler.call::<2>(),
+        3 => handler.call::<3>(),
+        4 => handler.call::<4>(),
+        5 => handler.call::<5>(),
+        6 => handler.call::<6>(),
+        7 => handler.call::<7>(),
+        8 => handler.call::<8>(),
+        9 => handler.call::<9>(),
+        10 => handler.call::<10>(),
+        11 => handler.call::<11>(),
+        12 => handler.call::<12>(),
+        _ => Err(DynTensorError::UnsupportedRank {
+            msg: "unsupported rank".to_string(),
+            rank,
+        }),
+    }
 }
 
 pub enum ValuesArg<B: Backend> {
@@ -203,21 +54,21 @@ pub enum ValuesArg<B: Backend> {
     Data(TensorData),
 }
 
-impl<B: Backend> Into<ValuesArg<B>> for DynTensor<B> {
-    fn into(self) -> ValuesArg<B> {
-        ValuesArg::Dyn(self)
+impl<B: Backend> From<DynTensor<B>> for ValuesArg<B> {
+    fn from(val: DynTensor<B>) -> Self {
+        ValuesArg::Dyn(val)
     }
 }
 
-impl<B: Backend> Into<ValuesArg<B>> for TensorData {
-    fn into(self) -> ValuesArg<B> {
-        ValuesArg::Data(self)
+impl<B: Backend> From<TensorData> for ValuesArg<B> {
+    fn from(val: TensorData) -> Self {
+        ValuesArg::Data(val)
     }
 }
 
-impl<B: Backend, const R: usize, K: BasicOps<B> + 'static> Into<ValuesArg<B>> for Tensor<B, R, K> {
-    fn into(self) -> ValuesArg<B> {
-        ValuesArg::Dyn(DynTensor::new(self))
+impl<B: Backend, const R: usize, K: BasicOps<B> + 'static> From<Tensor<B, R, K>> for ValuesArg<B> {
+    fn from(val: Tensor<B, R, K>) -> Self {
+        ValuesArg::Dyn(DynTensor::new(val))
     }
 }
 
@@ -232,9 +83,9 @@ pub struct DynTensor<B: Backend> {
     phantom: std::marker::PhantomData<B>,
 }
 
-impl<B: Backend, const R: usize, K: BasicOps<B> + 'static> Into<DynTensor<B>> for Tensor<B, R, K> {
-    fn into(self) -> DynTensor<B> {
-        DynTensor::new(self)
+impl<B: Backend, const R: usize, K: BasicOps<B> + 'static> From<Tensor<B, R, K>> for DynTensor<B> {
+    fn from(val: Tensor<B, R, K>) -> Self {
+        DynTensor::new(val)
     }
 }
 
@@ -324,24 +175,36 @@ impl<B: Backend> DynTensor<B> {
         indexing::check_slices_bounds(&self.shape(), &slices)
             .map_err(DynTensorError::SliceError)?;
 
-        match rank {
-            1 => slice_rank_case!(self, Self, 1, slices),
-            2 => slice_rank_case!(self, Self, 2, slices),
-            3 => slice_rank_case!(self, Self, 3, slices),
-            4 => slice_rank_case!(self, Self, 4, slices),
-            5 => slice_rank_case!(self, Self, 5, slices),
-            6 => slice_rank_case!(self, Self, 6, slices),
-            7 => slice_rank_case!(self, Self, 7, slices),
-            8 => slice_rank_case!(self, Self, 8, slices),
-            9 => slice_rank_case!(self, Self, 9, slices),
-            10 => slice_rank_case!(self, Self, 10, slices),
-            11 => slice_rank_case!(self, Self, 11, slices),
-            12 => slice_rank_case!(self, Self, 12, slices),
-            _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("slice rank ({}) is not supported", R),
-                rank,
-            }),
+        struct SliceHandler<'a, B: Backend, const R: usize> {
+            tensor: &'a DynTensor<B>,
+            slices: [Slice; R],
         }
+        impl<'a, B: Backend, const R: usize> RankHandler for SliceHandler<'a, B, R> {
+            type Output = DynTensor<B>;
+            fn call<const R2: usize>(self) -> Result<Self::Output, DynTensorError> {
+                match self.tensor.kind {
+                    KindFlag::Float => {
+                        let tensor: Tensor<B, R, Float> = self.tensor.downcast_clone().unwrap();
+                        Ok(DynTensor::new(tensor.slice(self.slices)))
+                    }
+                    KindFlag::Int => {
+                        let tensor: Tensor<B, R, Int> = self.tensor.downcast_clone().unwrap();
+                        Ok(DynTensor::new(tensor.slice(self.slices)))
+                    }
+                    KindFlag::Bool => {
+                        let tensor: Tensor<B, R, Bool> = self.tensor.downcast_clone().unwrap();
+                        Ok(DynTensor::new(tensor.slice(self.slices)))
+                    }
+                }
+            }
+        }
+        dispatch_rank(
+            rank,
+            SliceHandler {
+                tensor: self,
+                slices,
+            },
+        )
     }
 
     /// A dynamic version of [`DynTensor::slice`].
@@ -355,24 +218,36 @@ impl<B: Backend> DynTensor<B> {
 
         indexing::check_slices_bounds(&self.shape(), slices).map_err(DynTensorError::SliceError)?;
 
-        match rank {
-            1 => slice_dyn_rank_case!(self, Self, 1, slices),
-            2 => slice_dyn_rank_case!(self, Self, 2, slices),
-            3 => slice_dyn_rank_case!(self, Self, 3, slices),
-            4 => slice_dyn_rank_case!(self, Self, 4, slices),
-            5 => slice_dyn_rank_case!(self, Self, 5, slices),
-            6 => slice_dyn_rank_case!(self, Self, 6, slices),
-            7 => slice_dyn_rank_case!(self, Self, 7, slices),
-            8 => slice_dyn_rank_case!(self, Self, 8, slices),
-            9 => slice_dyn_rank_case!(self, Self, 9, slices),
-            10 => slice_dyn_rank_case!(self, Self, 10, slices),
-            11 => slice_dyn_rank_case!(self, Self, 11, slices),
-            12 => slice_dyn_rank_case!(self, Self, 12, slices),
-            _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("slice rank ({}) is not supported", rank),
-                rank,
-            }),
+        struct SliceDynHandler<'a, B: Backend> {
+            tensor: &'a DynTensor<B>,
+            slices: &'a [Slice],
         }
+        impl<'a, B: Backend> RankHandler for SliceDynHandler<'a, B> {
+            type Output = DynTensor<B>;
+            fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
+                match self.tensor.kind {
+                    KindFlag::Float => {
+                        let tensor: Tensor<B, R, Float> = self.tensor.downcast_clone().unwrap();
+                        Ok(DynTensor::new(operations::slice_dyn(tensor, self.slices)))
+                    }
+                    KindFlag::Int => {
+                        let tensor: Tensor<B, R, Int> = self.tensor.downcast_clone().unwrap();
+                        Ok(DynTensor::new(operations::slice_dyn(tensor, self.slices)))
+                    }
+                    KindFlag::Bool => {
+                        let tensor: Tensor<B, R, Bool> = self.tensor.downcast_clone().unwrap();
+                        Ok(DynTensor::new(operations::slice_dyn(tensor, self.slices)))
+                    }
+                }
+            }
+        }
+        dispatch_rank(
+            rank,
+            SliceDynHandler {
+                tensor: self,
+                slices,
+            },
+        )
     }
 
     /// Assign values to a slice.
@@ -411,24 +286,41 @@ impl<B: Backend> DynTensor<B> {
 
         // TODO: check that slices shape == source.shape
 
-        match rank {
-            1 => slice_assign_rank_case!(self, Self, 1, slices, values),
-            2 => slice_assign_rank_case!(self, Self, 2, slices, values),
-            3 => slice_assign_rank_case!(self, Self, 3, slices, values),
-            4 => slice_assign_rank_case!(self, Self, 4, slices, values),
-            5 => slice_assign_rank_case!(self, Self, 5, slices, values),
-            6 => slice_assign_rank_case!(self, Self, 6, slices, values),
-            7 => slice_assign_rank_case!(self, Self, 7, slices, values),
-            8 => slice_assign_rank_case!(self, Self, 8, slices, values),
-            9 => slice_assign_rank_case!(self, Self, 9, slices, values),
-            10 => slice_assign_rank_case!(self, Self, 10, slices, values),
-            11 => slice_assign_rank_case!(self, Self, 11, slices, values),
-            12 => slice_assign_rank_case!(self, Self, 12, slices, values),
-            _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("tensor rank ({}) is not supported", rank),
-                rank,
-            }),
+        struct SliceAssignHandler<B: Backend, const R2: usize> {
+            tensor: DynTensor<B>,
+            slices: [Slice; R2],
+            values: DynTensor<B>,
         }
+        impl<B: Backend, const R2: usize> RankHandler for SliceAssignHandler<B, R2> {
+            type Output = DynTensor<B>;
+            fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
+                match self.tensor.kind {
+                    KindFlag::Float => {
+                        let tensor: Tensor<B, R, Float> = self.tensor.downcast_clone().unwrap();
+                        let values: Tensor<B, R, Float> = self.values.downcast_clone().unwrap();
+                        Ok(DynTensor::new(tensor.slice_assign(self.slices, values)))
+                    }
+                    KindFlag::Int => {
+                        let tensor: Tensor<B, R, Int> = self.tensor.downcast_clone().unwrap();
+                        let values: Tensor<B, R, Int> = self.values.downcast_clone().unwrap();
+                        Ok(DynTensor::new(tensor.slice_assign(self.slices, values)))
+                    }
+                    KindFlag::Bool => {
+                        let tensor: Tensor<B, R, Bool> = self.tensor.downcast_clone().unwrap();
+                        let values: Tensor<B, R, Bool> = self.values.downcast_clone().unwrap();
+                        Ok(DynTensor::new(tensor.slice_assign(self.slices, values)))
+                    }
+                }
+            }
+        }
+        dispatch_rank(
+            rank,
+            SliceAssignHandler {
+                tensor: self.clone(),
+                slices,
+                values,
+            },
+        )
     }
 
     /// Dynamic slice rank version of [`DynTensor::slice_assign`].
@@ -442,81 +334,113 @@ impl<B: Backend> DynTensor<B> {
     where
         V: Into<ValuesArg<B>>,
     {
-        let s_rank = slices.len();
-
-        match s_rank {
-            1 => slice_assign_dyn_rank_case!(self, Self, 1, slices, values),
-            2 => slice_assign_dyn_rank_case!(self, Self, 2, slices, values),
-            3 => slice_assign_dyn_rank_case!(self, Self, 3, slices, values),
-            4 => slice_assign_dyn_rank_case!(self, Self, 4, slices, values),
-            5 => slice_assign_dyn_rank_case!(self, Self, 5, slices, values),
-            6 => slice_assign_dyn_rank_case!(self, Self, 6, slices, values),
-            7 => slice_assign_dyn_rank_case!(self, Self, 7, slices, values),
-            8 => slice_assign_dyn_rank_case!(self, Self, 8, slices, values),
-            9 => slice_assign_dyn_rank_case!(self, Self, 9, slices, values),
-            10 => slice_assign_dyn_rank_case!(self, Self, 10, slices, values),
-            11 => slice_assign_dyn_rank_case!(self, Self, 11, slices, values),
-            12 => slice_assign_dyn_rank_case!(self, Self, 12, slices, values),
-            _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("slices rank ({}) is not supported", s_rank),
-                rank: s_rank,
-            }),
+        struct SliceAssignDynHandler<'a, B: Backend> {
+            tensor: &'a DynTensor<B>,
+            slices: &'a [Slice],
+            values: ValuesArg<B>,
         }
+        impl<'a, B: Backend> RankHandler for SliceAssignDynHandler<'a, B> {
+            type Output = DynTensor<B>;
+            fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
+                let slices: [Slice; R] = self.slices.try_into().unwrap();
+                self.tensor.slice_assign(slices, self.values)
+            }
+        }
+        dispatch_rank(
+            self.rank(),
+            SliceAssignDynHandler {
+                tensor: self,
+                slices,
+                values: values.into(),
+            },
+        )
     }
 
     /// Flatten the tensor.
     ///
     /// Generated up to rank 12.
     pub fn flatten(self) -> Result<Self, DynTensorError> {
-        let rank = self.rank();
-
-        match rank {
-            1 => flatten_rank_case!(self, Self, 1),
-            2 => flatten_rank_case!(self, Self, 2),
-            3 => flatten_rank_case!(self, Self, 3),
-            4 => flatten_rank_case!(self, Self, 4),
-            5 => flatten_rank_case!(self, Self, 5),
-            6 => flatten_rank_case!(self, Self, 6),
-            7 => flatten_rank_case!(self, Self, 7),
-            8 => flatten_rank_case!(self, Self, 8),
-            9 => flatten_rank_case!(self, Self, 9),
-            10 => flatten_rank_case!(self, Self, 10),
-            11 => flatten_rank_case!(self, Self, 11),
-            12 => flatten_rank_case!(self, Self, 12),
-            _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("flatten rank ({}) is not supported", rank),
-                rank,
-            }),
+        struct FlattenHandler<B: Backend> {
+            tensor: DynTensor<B>,
         }
+        impl<B: Backend> RankHandler for FlattenHandler<B> {
+            type Output = DynTensor<B>;
+            fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
+                match self.tensor.kind {
+                    KindFlag::Float => {
+                        let tensor: Tensor<B, R, Float> = self.tensor.downcast_clone().unwrap();
+                        Ok(DynTensor::new(
+                            tensor.flatten::<1>(0, self.tensor.rank() - 1),
+                        ))
+                    }
+                    KindFlag::Int => {
+                        let tensor: Tensor<B, R, Int> = self.tensor.downcast_clone().unwrap();
+                        Ok(DynTensor::new(
+                            tensor.flatten::<1>(0, self.tensor.rank() - 1),
+                        ))
+                    }
+                    KindFlag::Bool => {
+                        let tensor: Tensor<B, R, Bool> = self.tensor.downcast_clone().unwrap();
+                        Ok(DynTensor::new(
+                            tensor.flatten::<1>(0, self.tensor.rank() - 1),
+                        ))
+                    }
+                }
+            }
+        }
+        dispatch_rank(self.rank(), FlattenHandler { tensor: self })
     }
 
     /// Cast the tensor.
     ///
-    /// Generated up to rank 12.
+    /// Auto-converts kind if necessary.
     pub fn cast(
         self,
         dtype: DType,
     ) -> Result<Self, DynTensorError> {
-        let rank = self.rank();
-
-        match rank {
-            1 => cast_rank_case!(self, Self, 1, dtype),
-            2 => cast_rank_case!(self, Self, 2, dtype),
-            3 => cast_rank_case!(self, Self, 3, dtype),
-            4 => cast_rank_case!(self, Self, 4, dtype),
-            5 => cast_rank_case!(self, Self, 5, dtype),
-            6 => cast_rank_case!(self, Self, 6, dtype),
-            7 => cast_rank_case!(self, Self, 7, dtype),
-            8 => cast_rank_case!(self, Self, 8, dtype),
-            9 => cast_rank_case!(self, Self, 9, dtype),
-            10 => cast_rank_case!(self, Self, 10, dtype),
-            11 => cast_rank_case!(self, Self, 11, dtype),
-            12 => cast_rank_case!(self, Self, 12, dtype),
-            _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("cast rank ({}) is not supported", rank),
-                rank,
-            }),
+        struct CastHandler<B: Backend> {
+            tensor: DynTensor<B>,
+            dtype: DType,
         }
+        impl<B: Backend> RankHandler for CastHandler<B> {
+            type Output = DynTensor<B>;
+            fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
+                let target_kind: KindFlag = self.dtype.into();
+                match self.tensor.kind {
+                    KindFlag::Float => {
+                        let tensor: Tensor<B, R, Float> = self.tensor.downcast_clone().unwrap();
+                        Ok(match target_kind {
+                            KindFlag::Float => DynTensor::new(tensor.cast(self.dtype)),
+                            KindFlag::Int => DynTensor::new(tensor.int().cast(self.dtype)),
+                            KindFlag::Bool => DynTensor::new(tensor.bool()),
+                        })
+                    }
+                    KindFlag::Int => {
+                        let tensor: Tensor<B, R, Int> = self.tensor.downcast_clone().unwrap();
+                        Ok(match target_kind {
+                            KindFlag::Float => DynTensor::new(tensor.float().cast(self.dtype)),
+                            KindFlag::Int => DynTensor::new(tensor.cast(self.dtype)),
+                            KindFlag::Bool => DynTensor::new(tensor.bool()),
+                        })
+                    }
+                    KindFlag::Bool => {
+                        let tensor: Tensor<B, R, Bool> = self.tensor.downcast_clone().unwrap();
+                        Ok(match target_kind {
+                            KindFlag::Float => DynTensor::new(tensor.float().cast(self.dtype)),
+                            KindFlag::Int => DynTensor::new(tensor.int().cast(self.dtype)),
+                            KindFlag::Bool => self.tensor,
+                        })
+                    }
+                }
+            }
+        }
+        dispatch_rank(
+            self.rank(),
+            CastHandler {
+                tensor: self,
+                dtype,
+            },
+        )
     }
 
     /// Move the tensor to the given device.
@@ -529,26 +453,40 @@ impl<B: Backend> DynTensor<B> {
         if &self.device() == device {
             return Ok(self);
         }
-        let rank = self.rank();
 
-        match rank {
-            1 => to_device_rank_case!(self, Self, 1, device),
-            2 => to_device_rank_case!(self, Self, 2, device),
-            3 => to_device_rank_case!(self, Self, 3, device),
-            4 => to_device_rank_case!(self, Self, 4, device),
-            5 => to_device_rank_case!(self, Self, 5, device),
-            6 => to_device_rank_case!(self, Self, 6, device),
-            7 => to_device_rank_case!(self, Self, 7, device),
-            8 => to_device_rank_case!(self, Self, 8, device),
-            9 => to_device_rank_case!(self, Self, 9, device),
-            10 => to_device_rank_case!(self, Self, 10, device),
-            11 => to_device_rank_case!(self, Self, 11, device),
-            12 => to_device_rank_case!(self, Self, 12, device),
-            _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("to_device rank ({}) is not supported", rank),
-                rank,
-            }),
+        struct ToDeviceHandler<'a, B: Backend> {
+            tensor: DynTensor<B>,
+            device: &'a B::Device,
         }
+        impl<'a, B: Backend> RankHandler for ToDeviceHandler<'a, B> {
+            type Output = DynTensor<B>;
+            fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
+                match self.tensor.kind {
+                    KindFlag::Float => {
+                        let tensor: Tensor<B, R, Float> = self.tensor.downcast_clone().unwrap();
+                        let tensor = tensor.to_device(self.device);
+                        Ok(DynTensor::new(tensor))
+                    }
+                    KindFlag::Int => {
+                        let tensor: Tensor<B, R, Int> = self.tensor.downcast_clone().unwrap();
+                        let tensor = tensor.to_device(self.device);
+                        Ok(DynTensor::new(tensor))
+                    }
+                    KindFlag::Bool => {
+                        let tensor: Tensor<B, R, Bool> = self.tensor.downcast_clone().unwrap();
+                        let tensor = tensor.to_device(self.device);
+                        Ok(DynTensor::new(tensor))
+                    }
+                }
+            }
+        }
+        dispatch_rank(
+            self.rank(),
+            ToDeviceHandler {
+                tensor: self,
+                device,
+            },
+        )
     }
 
     /// Convert a [`TensorData`] to a [`DynTensor`].
@@ -558,53 +496,60 @@ impl<B: Backend> DynTensor<B> {
         data: TensorData,
         device: &B::Device,
     ) -> Result<Self, DynTensorError> {
-        let rank = data.rank();
-        let kind: KindFlag = data.dtype.into();
-
-        match rank {
-            1 => from_data_rank_case!(1, data, kind, device),
-            2 => from_data_rank_case!(2, data, kind, device),
-            3 => from_data_rank_case!(3, data, kind, device),
-            4 => from_data_rank_case!(4, data, kind, device),
-            5 => from_data_rank_case!(5, data, kind, device),
-            6 => from_data_rank_case!(6, data, kind, device),
-            7 => from_data_rank_case!(7, data, kind, device),
-            8 => from_data_rank_case!(8, data, kind, device),
-            9 => from_data_rank_case!(9, data, kind, device),
-            10 => from_data_rank_case!(10, data, kind, device),
-            11 => from_data_rank_case!(11, data, kind, device),
-            12 => from_data_rank_case!(12, data, kind, device),
-            _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("from_data rank ({}) is not supported", rank),
-                rank,
-            }),
+        struct FromDataHandler<'a, B: Backend> {
+            data: TensorData,
+            device: &'a B::Device,
         }
+        impl<'a, B: Backend> RankHandler for FromDataHandler<'a, B> {
+            type Output = DynTensor<B>;
+            fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
+                let kind: KindFlag = self.data.dtype.into();
+                match kind {
+                    KindFlag::Float => {
+                        let tensor: Tensor<B, R, Float> = Tensor::from_data(self.data, self.device);
+                        Ok(DynTensor::new(tensor))
+                    }
+                    KindFlag::Int => {
+                        let tensor: Tensor<B, R, Int> = Tensor::from_data(self.data, self.device);
+                        Ok(DynTensor::new(tensor))
+                    }
+                    KindFlag::Bool => {
+                        let tensor: Tensor<B, R, Bool> = Tensor::from_data(self.data, self.device);
+                        Ok(DynTensor::new(tensor))
+                    }
+                }
+            }
+        }
+        dispatch_rank(data.rank(), FromDataHandler { data, device })
     }
 
     /// Convert the tensor to a [`TensorData`].
     ///
     /// Generated up to rank 12.
     pub fn to_data(self) -> Result<TensorData, DynTensorError> {
-        let rank = self.rank();
-
-        match rank {
-            1 => to_data_rank_case!(self, Self, 1),
-            2 => to_data_rank_case!(self, Self, 2),
-            3 => to_data_rank_case!(self, Self, 3),
-            4 => to_data_rank_case!(self, Self, 4),
-            5 => to_data_rank_case!(self, Self, 5),
-            6 => to_data_rank_case!(self, Self, 6),
-            7 => to_data_rank_case!(self, Self, 7),
-            8 => to_data_rank_case!(self, Self, 8),
-            9 => to_data_rank_case!(self, Self, 9),
-            10 => to_data_rank_case!(self, Self, 10),
-            11 => to_data_rank_case!(self, Self, 11),
-            12 => to_data_rank_case!(self, Self, 12),
-            _ => Err(DynTensorError::UnsupportedRank {
-                msg: format!("to_data rank ({}) is not supported", rank),
-                rank,
-            }),
+        struct ToDataHandler<B: Backend> {
+            tensor: DynTensor<B>,
         }
+        impl<B: Backend> RankHandler for ToDataHandler<B> {
+            type Output = TensorData;
+            fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
+                match self.tensor.kind {
+                    KindFlag::Float => {
+                        let tensor: Tensor<B, R, Float> = self.tensor.downcast_clone().unwrap();
+                        Ok(tensor.to_data())
+                    }
+                    KindFlag::Int => {
+                        let tensor: Tensor<B, R, Int> = self.tensor.downcast_clone().unwrap();
+                        Ok(tensor.to_data())
+                    }
+                    KindFlag::Bool => {
+                        let tensor: Tensor<B, R, Bool> = self.tensor.downcast_clone().unwrap();
+                        Ok(tensor.to_data())
+                    }
+                }
+            }
+        }
+        dispatch_rank(self.rank(), ToDataHandler { tensor: self })
     }
 }
 

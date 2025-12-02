@@ -24,11 +24,11 @@ impl KindFlag {
     ) -> Result<Self, KindError> {
         let any: &dyn Any = tensor;
 
-        if let Some(_) = any.downcast_ref::<Tensor<B, R, Float>>() {
+        if any.downcast_ref::<Tensor<B, R, Float>>().is_some() {
             Ok(Self::Float)
-        } else if let Some(_) = any.downcast_ref::<Tensor<B, R, Int>>() {
+        } else if any.downcast_ref::<Tensor<B, R, Int>>().is_some() {
             Ok(Self::Int)
-        } else if let Some(_) = any.downcast_ref::<Tensor<B, R, Bool>>() {
+        } else if any.downcast_ref::<Tensor<B, R, Bool>>().is_some() {
             Ok(Self::Bool)
         } else {
             Err(KindError {
@@ -38,11 +38,11 @@ impl KindFlag {
     }
 }
 
-impl Into<KindFlag> for DType {
-    fn into(self) -> KindFlag {
-        if self.is_float() {
+impl From<DType> for KindFlag {
+    fn from(val: DType) -> Self {
+        if val.is_float() {
             KindFlag::Float
-        } else if self.is_int() {
+        } else if val.is_int() {
             KindFlag::Int
         } else {
             KindFlag::Bool

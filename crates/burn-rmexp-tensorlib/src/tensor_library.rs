@@ -180,6 +180,11 @@ impl<B: Backend> UuidMapTensorLibrary<B> {
         self.hash_map.len()
     }
 
+    /// Returns `true` if the library contains no tensors.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Returns the size estimate of the library in bytes.
     pub fn size_estimate(&self) -> usize {
         self.hash_map
