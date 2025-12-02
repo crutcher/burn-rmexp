@@ -56,43 +56,29 @@ pub fn dispatch_rank<H: RankHandler>(
 }
 
 /// Values conversion trait for [`DynTensor::slice_assign`].
-#[derive(Debug, Clone)]
-pub enum ValuesArg<B: Backend> {
-    /// A [`DynTensor`] wrapper.
-    Dyn(DynTensor<B>),
-
-    /// A [`TensorData`] wrapper.
-    Data(TensorData),
+pub trait ValuesArg<B: Backend>: Sized {
+    /// Convert to a [`DynTensor`] on a given device.
+    fn into_values(
+        self,
+        device: &B::Device,
+    ) -> Result<DynTensor<B>, DynTensorError>;
 }
 
-impl<B: Backend> ValuesArg<B> {
-    /// Convert to a [`DynTensor`] on a given device.
-    fn into_dyntensor(
+impl<B: Backend, T: Into<DynTensor<B>>> ValuesArg<B> for T {
+    fn into_values(
         self,
         device: &B::Device,
     ) -> Result<DynTensor<B>, DynTensorError> {
-        match self {
-            ValuesArg::Dyn(val) => val.to_device(device),
-            ValuesArg::Data(val) => DynTensor::from_data(val, device),
-        }
+        self.into().to_device(device)
     }
 }
 
-impl<B: Backend> From<DynTensor<B>> for ValuesArg<B> {
-    fn from(val: DynTensor<B>) -> Self {
-        ValuesArg::Dyn(val)
-    }
-}
-
-impl<B: Backend> From<TensorData> for ValuesArg<B> {
-    fn from(val: TensorData) -> Self {
-        ValuesArg::Data(val)
-    }
-}
-
-impl<B: Backend, const R: usize, K: BasicOps<B> + 'static> From<Tensor<B, R, K>> for ValuesArg<B> {
-    fn from(val: Tensor<B, R, K>) -> Self {
-        ValuesArg::Dyn(DynTensor::new(val))
+impl<B: Backend> ValuesArg<B> for TensorData {
+    fn into_values(
+        self,
+        device: &B::Device,
+    ) -> Result<DynTensor<B>, DynTensorError> {
+        DynTensor::from_data(self, device)
     }
 }
 
@@ -107,7 +93,10 @@ pub struct DynTensor<B: Backend> {
     phantom: std::marker::PhantomData<B>,
 }
 
-impl<B: Backend, const R: usize, K: BasicOps<B> + 'static> From<Tensor<B, R, K>> for DynTensor<B> {
+impl<B: Backend, const R: usize, K> From<Tensor<B, R, K>> for DynTensor<B>
+where
+    K: 'static + BasicOps<B>,
+{
     fn from(val: Tensor<B, R, K>) -> Self {
         DynTensor::new(val)
     }
@@ -316,11 +305,11 @@ impl<B: Backend> DynTensor<B> {
     ) -> Result<Self, DynTensorError>
     where
         S: SliceArg<R2>,
-        V: Into<ValuesArg<B>>,
+        V: ValuesArg<B>,
     {
         let rank = self.rank();
         let slices = self.shape().into_slices(slices);
-        let values: DynTensor<B> = values.into().into_dyntensor(&self.device())?;
+        let values: DynTensor<B> = values.into_values(&self.device())?;
 
         indexing::check_slices_bounds(&self.shape(), &slices)
             .map_err(DynTensorError::SliceError)?;
@@ -393,12 +382,12 @@ impl<B: Backend> DynTensor<B> {
         values: V,
     ) -> Result<Self, DynTensorError>
     where
-        V: Into<ValuesArg<B>>,
+        V: ValuesArg<B>,
     {
         struct SliceAssignDynHandler<'a, B: Backend> {
             tensor: DynTensor<B>,
             slices: &'a [Slice],
-            values: ValuesArg<B>,
+            values: DynTensor<B>,
         }
         impl<'a, B: Backend> RankHandler for SliceAssignDynHandler<'a, B> {
             type Output = DynTensor<B>;
@@ -407,12 +396,13 @@ impl<B: Backend> DynTensor<B> {
                 self.tensor.slice_assign(slices, self.values)
             }
         }
+        let values = values.into_values(&self.device())?;
         dispatch_rank(
             self.rank(),
             SliceAssignDynHandler {
                 tensor: self,
                 slices,
-                values: values.into(),
+                values,
             },
         )
     }
