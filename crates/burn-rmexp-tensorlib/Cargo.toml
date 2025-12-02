@@ -1,0 +1,25 @@
+[package]
+name = "burn-rmexp-tensorlib"
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+license.workspace = true
+documentation = "https://docs.rs/burn-rmexp-tensorlib/latest/"
+description = "burn remote experiment tensor lib"
+
+[dependencies]
+burn-rmexp-dyntensor = { path = "../burn-rmexp-dyntensor" }
+
+burn = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["full", "tracing"] }
+futures = { workspace = true }
+uuid = { workspace = true, features = ["serde", "v4"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+burn = { workspace = true, features = ["wgpu"] }
+
+[lints]
+workspace = true

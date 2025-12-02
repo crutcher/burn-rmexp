@@ -1,3 +1,4 @@
+//! # Tensor Indexing Utilities
 use burn::prelude::Shape;
 use burn::tensor::Slice;
 use std::fmt::{Display, Formatter};

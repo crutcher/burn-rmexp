@@ -1,5 +1,5 @@
-use crate::dyn_tensor::DynTensor;
 use burn::prelude::Backend;
+use burn_ext_dyntensor::DynTensor;
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -281,11 +281,11 @@ impl<B: Backend> TensorLibrary<B> for LazyBuilderLibrary<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kind::KindFlag;
     use burn::Tensor;
     use burn::backend::Wgpu;
     use burn::backend::wgpu::WgpuDevice;
     use burn::prelude::Shape;
+    use burn_ext_dyntensor::{DynTensor, KindFlag};
 
     #[tokio::test]
     async fn test_map_library() {

@@ -1,3 +1,4 @@
+//! # Tensor Operations
 use burn::Tensor;
 use burn::prelude::Backend;
 use burn::tensor::{BasicOps, Slice};

@@ -1,7 +1,8 @@
 use crate::clone_box::CloneBox;
-use crate::index::SlicesError;
+use crate::indexing;
+use crate::indexing::SlicesError;
 use crate::kind::KindFlag;
-use crate::{index, tensor_util};
+use crate::operations;
 use burn::Tensor;
 use burn::prelude::{Backend, Bool, Float, Int, Shape, SliceArg, TensorData};
 use burn::tensor::{BasicOps, DType, Slice};
@@ -75,15 +76,15 @@ macro_rules! slice_dyn_rank_case {
         match $self.kind {
             KindFlag::Float => {
                 let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
+                Ok($self_type::new(operations::slice_dyn(tensor, $slices)))
             }
             KindFlag::Int => {
                 let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
+                Ok($self_type::new(operations::slice_dyn(tensor, $slices)))
             }
             KindFlag::Bool => {
                 let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
+                Ok($self_type::new(operations::slice_dyn(tensor, $slices)))
             }
         }
     };
@@ -320,7 +321,8 @@ impl<B: Backend> DynTensor<B> {
         let rank = self.rank();
         let slices = self.shape().into_slices(slices);
 
-        index::check_slices_bounds(&self.shape(), &slices).map_err(DynTensorError::SliceError)?;
+        indexing::check_slices_bounds(&self.shape(), &slices)
+            .map_err(DynTensorError::SliceError)?;
 
         match rank {
             1 => slice_rank_case!(self, Self, 1, slices),
@@ -351,7 +353,7 @@ impl<B: Backend> DynTensor<B> {
     ) -> Result<Self, DynTensorError> {
         let rank = self.rank();
 
-        index::check_slices_bounds(&self.shape(), slices).map_err(DynTensorError::SliceError)?;
+        indexing::check_slices_bounds(&self.shape(), slices).map_err(DynTensorError::SliceError)?;
 
         match rank {
             1 => slice_dyn_rank_case!(self, Self, 1, slices),
@@ -392,7 +394,8 @@ impl<B: Backend> DynTensor<B> {
             ValuesArg::Data(values) => DynTensor::from_data(values, &self.device())?,
         };
 
-        index::check_slices_bounds(&self.shape(), &slices).map_err(DynTensorError::SliceError)?;
+        indexing::check_slices_bounds(&self.shape(), &slices)
+            .map_err(DynTensorError::SliceError)?;
 
         if rank != values.rank() {
             return Err(DynTensorError::InvalidArgument {

@@ -1,3 +1,4 @@
+//! # Clone Box Trait
 use std::any::Any;
 use std::fmt::Debug;
 
