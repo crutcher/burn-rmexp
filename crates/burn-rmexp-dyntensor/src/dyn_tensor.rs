@@ -206,38 +206,28 @@ impl<B: Backend> DynTensor<B> {
             .map_err(DynTensorError::SliceError)?;
 
         struct SliceHandler<B: Backend, const R: usize> {
-            tensor: DynTensor<B>,
+            this: DynTensor<B>,
             slices: [Slice; R],
         }
         impl<B: Backend, const R: usize> RankHandler for SliceHandler<B, R> {
             type Output = DynTensor<B>;
             fn call<const R2: usize>(self) -> Result<Self::Output, DynTensorError> {
-                Ok(match self.tensor.kind {
+                Ok(match self.this.kind {
                     KindFlag::Float => self
-                        .tensor
+                        .this
                         .unwrap_clone::<R, Float>()
                         .slice(self.slices)
                         .into(),
-                    KindFlag::Int => self
-                        .tensor
-                        .unwrap_clone::<R, Int>()
-                        .slice(self.slices)
-                        .into(),
+                    KindFlag::Int => self.this.unwrap_clone::<R, Int>().slice(self.slices).into(),
                     KindFlag::Bool => self
-                        .tensor
+                        .this
                         .unwrap_clone::<R, Bool>()
                         .slice(self.slices)
                         .into(),
                 })
             }
         }
-        dispatch_rank(
-            rank,
-            SliceHandler {
-                tensor: self,
-                slices,
-            },
-        )
+        dispatch_rank(rank, SliceHandler { this: self, slices })
     }
 
     /// A dynamic version of [`DynTensor::slice`].
@@ -259,36 +249,29 @@ impl<B: Backend> DynTensor<B> {
         indexing::check_slices_bounds(&self.shape(), slices).map_err(DynTensorError::SliceError)?;
 
         struct SliceDynHandler<'a, B: Backend> {
-            tensor: DynTensor<B>,
+            this: DynTensor<B>,
             slices: &'a [Slice],
         }
         impl<'a, B: Backend> RankHandler for SliceDynHandler<'a, B> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
-                Ok(match self.tensor.kind {
-                    KindFlag::Float => operations::slice_dyn::<B, R, Float>(
-                        self.tensor.unwrap_clone(),
-                        self.slices,
-                    )
-                    .into(),
+                Ok(match self.this.kind {
+                    KindFlag::Float => {
+                        operations::slice_dyn(self.this.unwrap_clone::<R, Float>(), self.slices)
+                            .into()
+                    }
                     KindFlag::Int => {
-                        operations::slice_dyn::<B, R, Int>(self.tensor.unwrap_clone(), self.slices)
+                        operations::slice_dyn(self.this.unwrap_clone::<R, Int>(), self.slices)
                             .into()
                     }
                     KindFlag::Bool => {
-                        operations::slice_dyn::<B, R, Bool>(self.tensor.unwrap_clone(), self.slices)
+                        operations::slice_dyn(self.this.unwrap_clone::<R, Bool>(), self.slices)
                             .into()
                     }
                 })
             }
         }
-        dispatch_rank(
-            rank,
-            SliceDynHandler {
-                tensor: self,
-                slices,
-            },
-        )
+        dispatch_rank(rank, SliceDynHandler { this: self, slices })
     }
 
     /// Assign values to a slice.
@@ -333,26 +316,26 @@ impl<B: Backend> DynTensor<B> {
         // TODO: check that slices shape == source.shape
 
         struct SliceAssignHandler<B: Backend, const R2: usize> {
-            tensor: DynTensor<B>,
+            this: DynTensor<B>,
             slices: [Slice; R2],
             values: DynTensor<B>,
         }
         impl<B: Backend, const R2: usize> RankHandler for SliceAssignHandler<B, R2> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
-                Ok(match self.tensor.kind {
+                Ok(match self.this.kind {
                     KindFlag::Float => self
-                        .tensor
+                        .this
                         .unwrap_clone::<R, Float>()
                         .slice_assign(self.slices, self.values.unwrap_clone())
                         .into(),
                     KindFlag::Int => self
-                        .tensor
+                        .this
                         .unwrap_clone::<R, Int>()
                         .slice_assign(self.slices, self.values.unwrap_clone())
                         .into(),
                     KindFlag::Bool => self
-                        .tensor
+                        .this
                         .unwrap_clone::<R, Bool>()
                         .slice_assign(self.slices, self.values.unwrap_clone())
                         .into(),
@@ -362,7 +345,7 @@ impl<B: Backend> DynTensor<B> {
         dispatch_rank(
             rank,
             SliceAssignHandler {
-                tensor: self.clone(),
+                this: self.clone(),
                 slices,
                 values,
             },
@@ -389,7 +372,7 @@ impl<B: Backend> DynTensor<B> {
         V: ValuesArg<B>,
     {
         struct SliceAssignDynHandler<'a, B: Backend> {
-            tensor: DynTensor<B>,
+            this: DynTensor<B>,
             slices: &'a [Slice],
             values: DynTensor<B>,
         }
@@ -397,14 +380,14 @@ impl<B: Backend> DynTensor<B> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
                 let slices: [Slice; R] = self.slices.try_into().unwrap();
-                self.tensor.slice_assign(slices, self.values)
+                self.this.slice_assign(slices, self.values)
             }
         }
         let values = values.into_values(&self.device())?;
         dispatch_rank(
             self.rank(),
             SliceAssignDynHandler {
-                tensor: self,
+                this: self,
                 slices,
                 values,
             },
@@ -464,16 +447,16 @@ impl<B: Backend> DynTensor<B> {
         dtype: DType,
     ) -> Result<Self, DynTensorError> {
         struct CastHandler<B: Backend> {
-            tensor: DynTensor<B>,
+            this: DynTensor<B>,
             dtype: DType,
         }
         impl<B: Backend> RankHandler for CastHandler<B> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
                 let target_kind: KindFlag = self.dtype.into();
-                Ok(match self.tensor.kind {
+                Ok(match self.this.kind {
                     KindFlag::Float => {
-                        let tensor: Tensor<B, R, Float> = self.tensor.unwrap_clone();
+                        let tensor: Tensor<B, R, Float> = self.this.unwrap_clone();
                         match target_kind {
                             KindFlag::Float => tensor.cast(self.dtype).into(),
                             KindFlag::Int => tensor.int().cast(self.dtype).into(),
@@ -481,7 +464,7 @@ impl<B: Backend> DynTensor<B> {
                         }
                     }
                     KindFlag::Int => {
-                        let tensor: Tensor<B, R, Int> = self.tensor.unwrap_clone();
+                        let tensor: Tensor<B, R, Int> = self.this.unwrap_clone();
                         match target_kind {
                             KindFlag::Float => tensor.float().cast(self.dtype).into(),
                             KindFlag::Int => tensor.cast(self.dtype).into(),
@@ -489,23 +472,17 @@ impl<B: Backend> DynTensor<B> {
                         }
                     }
                     KindFlag::Bool => {
-                        let tensor: Tensor<B, R, Bool> = self.tensor.unwrap_clone();
+                        let tensor: Tensor<B, R, Bool> = self.this.unwrap_clone();
                         match target_kind {
                             KindFlag::Float => tensor.float().cast(self.dtype).into(),
                             KindFlag::Int => tensor.int().cast(self.dtype).into(),
-                            KindFlag::Bool => self.tensor,
+                            KindFlag::Bool => self.this,
                         }
                     }
                 })
             }
         }
-        dispatch_rank(
-            self.rank(),
-            CastHandler {
-                tensor: self,
-                dtype,
-            },
-        )
+        dispatch_rank(self.rank(), CastHandler { this: self, dtype })
     }
 
     /// Move the tensor to the given device.
@@ -529,38 +506,32 @@ impl<B: Backend> DynTensor<B> {
         }
 
         struct ToDeviceHandler<'a, B: Backend> {
-            tensor: DynTensor<B>,
+            this: DynTensor<B>,
             device: &'a B::Device,
         }
         impl<'a, B: Backend> RankHandler for ToDeviceHandler<'a, B> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
-                Ok(match self.tensor.kind {
+                Ok(match self.this.kind {
                     KindFlag::Float => self
-                        .tensor
+                        .this
                         .unwrap_clone::<R, Float>()
                         .to_device(self.device)
                         .into(),
                     KindFlag::Int => self
-                        .tensor
+                        .this
                         .unwrap_clone::<R, Int>()
                         .to_device(self.device)
                         .into(),
                     KindFlag::Bool => self
-                        .tensor
+                        .this
                         .unwrap_clone::<R, Bool>()
                         .to_device(self.device)
                         .into(),
                 })
             }
         }
-        dispatch_rank(
-            self.rank(),
-            ToDeviceHandler {
-                tensor: self,
-                device,
-            },
-        )
+        dispatch_rank(self.rank(), ToDeviceHandler { this: self, device })
     }
 
     /// Convert a [`TensorData`] to a [`DynTensor`].
@@ -609,19 +580,19 @@ impl<B: Backend> DynTensor<B> {
     /// - `Err(DynTensorError)`: an error.
     pub fn to_data(self) -> Result<TensorData, DynTensorError> {
         struct ToDataHandler<B: Backend> {
-            tensor: DynTensor<B>,
+            this: DynTensor<B>,
         }
         impl<B: Backend> RankHandler for ToDataHandler<B> {
             type Output = TensorData;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
-                Ok(match self.tensor.kind {
-                    KindFlag::Float => self.tensor.unwrap_clone::<R, Float>().to_data(),
-                    KindFlag::Int => self.tensor.unwrap_clone::<R, Int>().to_data(),
-                    KindFlag::Bool => self.tensor.unwrap_clone::<R, Bool>().to_data(),
+                Ok(match self.this.kind {
+                    KindFlag::Float => self.this.unwrap_clone::<R, Float>().to_data(),
+                    KindFlag::Int => self.this.unwrap_clone::<R, Int>().to_data(),
+                    KindFlag::Bool => self.this.unwrap_clone::<R, Bool>().to_data(),
                 })
             }
         }
-        dispatch_rank(self.rank(), ToDataHandler { tensor: self })
+        dispatch_rank(self.rank(), ToDataHandler { this: self })
     }
 }
 
