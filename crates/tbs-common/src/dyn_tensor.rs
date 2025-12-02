@@ -12,6 +12,9 @@ pub enum DynTensorError {
     /// An error occurred while slicing.
     SliceError(SlicesError),
 
+    /// Invalid Arguments.
+    InvalidArgument { msg: String },
+
     /// The tensor rank is not supported for the requested operation.
     UnsupportedRank { msg: String, rank: usize },
 }
@@ -160,20 +163,20 @@ impl<B: Backend> DynTensor<B> {
     }
 }
 
-macro_rules! dyn_slice_rank_case {
+macro_rules! slice_dyn_rank_case {
     ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt) => {
         match $self.kind {
             KindFlag::Float => {
                 let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor_util::dyn_slice(tensor, $slices)))
+                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
             }
             KindFlag::Int => {
                 let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor_util::dyn_slice(tensor, $slices)))
+                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
             }
             KindFlag::Bool => {
                 let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
-                Ok($self_type::new(tensor_util::dyn_slice(tensor, $slices)))
+                Ok($self_type::new(tensor_util::slice_dyn(tensor, $slices)))
             }
         }
     };
@@ -192,21 +195,137 @@ impl<B: Backend> DynTensor<B> {
         index::check_slices_bounds(&self.shape(), slices).map_err(DynTensorError::SliceError)?;
 
         match rank {
-            1 => dyn_slice_rank_case!(self, Self, 1, slices),
-            2 => dyn_slice_rank_case!(self, Self, 2, slices),
-            3 => dyn_slice_rank_case!(self, Self, 3, slices),
-            4 => dyn_slice_rank_case!(self, Self, 4, slices),
-            5 => dyn_slice_rank_case!(self, Self, 5, slices),
-            6 => dyn_slice_rank_case!(self, Self, 6, slices),
-            7 => dyn_slice_rank_case!(self, Self, 7, slices),
-            8 => dyn_slice_rank_case!(self, Self, 8, slices),
-            9 => dyn_slice_rank_case!(self, Self, 9, slices),
-            10 => dyn_slice_rank_case!(self, Self, 10, slices),
-            11 => dyn_slice_rank_case!(self, Self, 11, slices),
-            12 => dyn_slice_rank_case!(self, Self, 12, slices),
+            1 => slice_dyn_rank_case!(self, Self, 1, slices),
+            2 => slice_dyn_rank_case!(self, Self, 2, slices),
+            3 => slice_dyn_rank_case!(self, Self, 3, slices),
+            4 => slice_dyn_rank_case!(self, Self, 4, slices),
+            5 => slice_dyn_rank_case!(self, Self, 5, slices),
+            6 => slice_dyn_rank_case!(self, Self, 6, slices),
+            7 => slice_dyn_rank_case!(self, Self, 7, slices),
+            8 => slice_dyn_rank_case!(self, Self, 8, slices),
+            9 => slice_dyn_rank_case!(self, Self, 9, slices),
+            10 => slice_dyn_rank_case!(self, Self, 10, slices),
+            11 => slice_dyn_rank_case!(self, Self, 11, slices),
+            12 => slice_dyn_rank_case!(self, Self, 12, slices),
             _ => Err(DynTensorError::UnsupportedRank {
                 msg: format!("slice rank ({}) is not supported", rank),
                 rank,
+            }),
+        }
+    }
+}
+
+macro_rules! slice_assign_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt, $values:tt) => {
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                let values: Tensor<B, $const_rank, Float> = $values.downcast_clone().unwrap();
+                let values = values.cast(tensor.dtype());
+                Ok($self_type::new(tensor.slice_assign($slices, values)))
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                let values: Tensor<B, $const_rank, Int> = $values.downcast_clone().unwrap();
+                let values = values.cast(tensor.dtype());
+                Ok($self_type::new(tensor.slice_assign($slices, values)))
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
+                let values: Tensor<B, $const_rank, Bool> = $values.downcast_clone().unwrap();
+                Ok($self_type::new(tensor.slice_assign($slices, values)))
+            }
+        }
+    };
+}
+
+macro_rules! slice_assign_dyn_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $slices:tt, $values:tt) => {{
+        let slices: [Slice; $const_rank] = $slices.try_into().unwrap();
+        $self.slice_assign(slices, $values)
+    }};
+}
+
+impl<B: Backend> DynTensor<B> {
+    /// Assign values to a slice.
+    ///
+    /// Generated up to rank 12.
+    pub fn slice_assign<const R2: usize, S, V>(
+        &self,
+        slices: S,
+        values: V,
+    ) -> Result<Self, DynTensorError>
+    where
+        S: SliceArg<R2>,
+        V: Into<DynTensor<B>>,
+    {
+        let rank = self.rank();
+        let slices = self.shape().into_slices(slices);
+        let values: DynTensor<B> = values.into();
+
+        index::check_slices_bounds(&self.shape(), &slices).map_err(DynTensorError::SliceError)?;
+
+        if rank != values.rank() {
+            return Err(DynTensorError::InvalidArgument {
+                msg: format!(
+                    "slice of rank ({}) cannot be assigned to tensor of rank ({})",
+                    values.rank(),
+                    rank
+                ),
+            });
+        }
+
+        // TODO: check that slices shape == source.shape
+
+        match rank {
+            1 => slice_assign_rank_case!(self, Self, 1, slices, values),
+            2 => slice_assign_rank_case!(self, Self, 2, slices, values),
+            3 => slice_assign_rank_case!(self, Self, 3, slices, values),
+            4 => slice_assign_rank_case!(self, Self, 4, slices, values),
+            5 => slice_assign_rank_case!(self, Self, 5, slices, values),
+            6 => slice_assign_rank_case!(self, Self, 6, slices, values),
+            7 => slice_assign_rank_case!(self, Self, 7, slices, values),
+            8 => slice_assign_rank_case!(self, Self, 8, slices, values),
+            9 => slice_assign_rank_case!(self, Self, 9, slices, values),
+            10 => slice_assign_rank_case!(self, Self, 10, slices, values),
+            11 => slice_assign_rank_case!(self, Self, 11, slices, values),
+            12 => slice_assign_rank_case!(self, Self, 12, slices, values),
+            _ => Err(DynTensorError::UnsupportedRank {
+                msg: format!("tensor rank ({}) is not supported", rank),
+                rank,
+            }),
+        }
+    }
+
+    /// Dynamic slice rank version of [`DynTensor::slice_assign`].
+    ///
+    /// Generated up to rank=12.
+    pub fn slice_assign_dyn<V>(
+        &self,
+        slices: &[Slice],
+        values: V,
+    ) -> Result<Self, DynTensorError>
+    where
+        V: Into<DynTensor<B>>,
+    {
+        let s_rank = slices.len();
+
+        match s_rank {
+            1 => slice_assign_dyn_rank_case!(self, Self, 1, slices, values),
+            2 => slice_assign_dyn_rank_case!(self, Self, 2, slices, values),
+            3 => slice_assign_dyn_rank_case!(self, Self, 3, slices, values),
+            4 => slice_assign_dyn_rank_case!(self, Self, 4, slices, values),
+            5 => slice_assign_dyn_rank_case!(self, Self, 5, slices, values),
+            6 => slice_assign_dyn_rank_case!(self, Self, 6, slices, values),
+            7 => slice_assign_dyn_rank_case!(self, Self, 7, slices, values),
+            8 => slice_assign_dyn_rank_case!(self, Self, 8, slices, values),
+            9 => slice_assign_dyn_rank_case!(self, Self, 9, slices, values),
+            10 => slice_assign_dyn_rank_case!(self, Self, 10, slices, values),
+            11 => slice_assign_dyn_rank_case!(self, Self, 11, slices, values),
+            12 => slice_assign_dyn_rank_case!(self, Self, 12, slices, values),
+            _ => Err(DynTensorError::UnsupportedRank {
+                msg: format!("slices rank ({}) is not supported", s_rank),
+                rank: s_rank,
             }),
         }
     }

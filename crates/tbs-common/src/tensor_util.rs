@@ -3,7 +3,7 @@ use burn::prelude::Backend;
 use burn::tensor::{BasicOps, Slice};
 
 /// Provides a dynamic version of [`Tensor::slice`].
-pub fn dyn_slice<B: Backend, const R: usize, K: BasicOps<B>>(
+pub fn slice_dyn<B: Backend, const R: usize, K: BasicOps<B>>(
     tensor: Tensor<B, R, K>,
     slices: &[Slice],
 ) -> Tensor<B, R, K> {
