@@ -45,7 +45,7 @@ impl<B: Backend> DynTensor<B> {
         Self {
             shape: tensor.shape(),
             dtype: tensor.dtype(),
-            kind: KindFlag::kind(&tensor).unwrap(),
+            kind: tensor.dtype().into(),
             device: tensor.device(),
             tensor: Box::new(tensor),
             phantom: std::marker::PhantomData,
@@ -372,6 +372,167 @@ impl<B: Backend> DynTensor<B> {
             12 => flatten_rank_case!(self, Self, 12),
             _ => Err(DynTensorError::UnsupportedRank {
                 msg: format!("flatten rank ({}) is not supported", rank),
+                rank,
+            }),
+        }
+    }
+}
+
+macro_rules! cast_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $dtype:tt) => {
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                let tensor = tensor.cast($dtype);
+                Ok($self_type::new(tensor))
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                let tensor = tensor.cast($dtype);
+                Ok($self_type::new(tensor))
+            }
+            KindFlag::Bool => Ok($self),
+        }
+    };
+}
+
+impl<B: Backend> DynTensor<B> {
+    /// Cast the tensor.
+    ///
+    /// Generated up to rank 12.
+    pub fn cast(
+        self,
+        dtype: DType,
+    ) -> Result<Self, DynTensorError> {
+        let rank = self.rank();
+        let cast_kind: KindFlag = dtype.into();
+
+        if cast_kind == self.kind {
+            return Err(DynTensorError::InvalidArgument {
+                msg: format!("casting to same dtype ({:?})", dtype),
+            });
+        }
+
+        match rank {
+            1 => cast_rank_case!(self, Self, 1, dtype),
+            2 => cast_rank_case!(self, Self, 2, dtype),
+            3 => cast_rank_case!(self, Self, 3, dtype),
+            4 => cast_rank_case!(self, Self, 4, dtype),
+            5 => cast_rank_case!(self, Self, 5, dtype),
+            6 => cast_rank_case!(self, Self, 6, dtype),
+            7 => cast_rank_case!(self, Self, 7, dtype),
+            8 => cast_rank_case!(self, Self, 8, dtype),
+            9 => cast_rank_case!(self, Self, 9, dtype),
+            10 => cast_rank_case!(self, Self, 10, dtype),
+            11 => cast_rank_case!(self, Self, 11, dtype),
+            12 => cast_rank_case!(self, Self, 12, dtype),
+            _ => Err(DynTensorError::UnsupportedRank {
+                msg: format!("cast rank ({}) is not supported", rank),
+                rank,
+            }),
+        }
+    }
+}
+macro_rules! to_device_rank_case {
+    ($self:tt, $self_type:tt, $const_rank:literal, $device:tt) => {
+        match $self.kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = $self.downcast_clone().unwrap();
+                let tensor = tensor.to_device($device);
+                Ok($self_type::new(tensor))
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = $self.downcast_clone().unwrap();
+                let tensor = tensor.to_device($device);
+                Ok($self_type::new(tensor))
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = $self.downcast_clone().unwrap();
+                let tensor = tensor.to_device($device);
+                Ok($self_type::new(tensor))
+            }
+        }
+    };
+}
+
+impl<B: Backend> DynTensor<B> {
+    /// Move the tensor to the given device.
+    ///
+    /// Generated up to rank 12.
+    pub fn to_device(
+        self,
+        device: &B::Device,
+    ) -> Result<Self, DynTensorError> {
+        if &self.device() == device {
+            return Ok(self);
+        }
+        let rank = self.rank();
+
+        match rank {
+            1 => to_device_rank_case!(self, Self, 1, device),
+            2 => to_device_rank_case!(self, Self, 2, device),
+            3 => to_device_rank_case!(self, Self, 3, device),
+            4 => to_device_rank_case!(self, Self, 4, device),
+            5 => to_device_rank_case!(self, Self, 5, device),
+            6 => to_device_rank_case!(self, Self, 6, device),
+            7 => to_device_rank_case!(self, Self, 7, device),
+            8 => to_device_rank_case!(self, Self, 8, device),
+            9 => to_device_rank_case!(self, Self, 9, device),
+            10 => to_device_rank_case!(self, Self, 10, device),
+            11 => to_device_rank_case!(self, Self, 11, device),
+            12 => to_device_rank_case!(self, Self, 12, device),
+            _ => Err(DynTensorError::UnsupportedRank {
+                msg: format!("to_device rank ({}) is not supported", rank),
+                rank,
+            }),
+        }
+    }
+}
+macro_rules! from_data_rank_case {
+    ($const_rank:literal, $data:tt, $kind:tt, $device:tt) => {
+        match $kind {
+            KindFlag::Float => {
+                let tensor: Tensor<B, $const_rank, Float> = Tensor::from_data($data, $device);
+                Ok(tensor.to_data())
+            }
+            KindFlag::Int => {
+                let tensor: Tensor<B, $const_rank, Int> = Tensor::from_data($data, $device);
+                Ok(tensor.to_data())
+            }
+            KindFlag::Bool => {
+                let tensor: Tensor<B, $const_rank, Bool> = Tensor::from_data($data, $device);
+                Ok(tensor.to_data())
+            }
+        }
+    };
+}
+
+impl<B: Backend> DynTensor<B> {
+    /// Convert a [`TensorData`] to a [`DynTensor`].
+    ///
+    /// Generated up to rank 12.
+    pub fn from_data(
+        data: TensorData,
+        device: &B::Device,
+    ) -> Result<TensorData, DynTensorError> {
+        let rank = data.rank();
+        let kind: KindFlag = data.dtype.into();
+
+        match rank {
+            1 => from_data_rank_case!(1, data, kind, device),
+            2 => from_data_rank_case!(2, data, kind, device),
+            3 => from_data_rank_case!(3, data, kind, device),
+            4 => from_data_rank_case!(4, data, kind, device),
+            5 => from_data_rank_case!(5, data, kind, device),
+            6 => from_data_rank_case!(6, data, kind, device),
+            7 => from_data_rank_case!(7, data, kind, device),
+            8 => from_data_rank_case!(8, data, kind, device),
+            9 => from_data_rank_case!(9, data, kind, device),
+            10 => from_data_rank_case!(10, data, kind, device),
+            11 => from_data_rank_case!(11, data, kind, device),
+            12 => from_data_rank_case!(12, data, kind, device),
+            _ => Err(DynTensorError::UnsupportedRank {
+                msg: format!("from_data rank ({}) is not supported", rank),
                 rank,
             }),
         }

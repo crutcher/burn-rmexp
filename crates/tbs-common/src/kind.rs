@@ -1,6 +1,6 @@
 use burn::Tensor;
 use burn::prelude::{Backend, Bool, Float, Int};
-use burn::tensor::TensorKind;
+use burn::tensor::{DType, TensorKind};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
@@ -34,6 +34,18 @@ impl KindFlag {
             Err(KindError {
                 msg: format!("Unsupported tensor kind: {:?}", K::name()),
             })
+        }
+    }
+}
+
+impl Into<KindFlag> for DType {
+    fn into(self) -> KindFlag {
+        if self.is_float() {
+            KindFlag::Float
+        } else if self.is_int() {
+            KindFlag::Int
+        } else {
+            KindFlag::Bool
         }
     }
 }
