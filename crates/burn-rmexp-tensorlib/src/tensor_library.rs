@@ -1,5 +1,5 @@
 use burn::prelude::Backend;
-use burn_ext_dyntensor::DynTensor;
+use burn_rmexp_dyntensor::DynTensor;
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -285,7 +285,7 @@ mod tests {
     use burn::backend::Wgpu;
     use burn::backend::wgpu::WgpuDevice;
     use burn::prelude::Shape;
-    use burn_ext_dyntensor::{DynTensor, KindFlag};
+    use burn_rmexp_dyntensor::{DynTensor, KindFlag};
 
     #[tokio::test]
     async fn test_map_library() {
