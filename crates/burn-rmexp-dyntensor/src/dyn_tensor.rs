@@ -174,7 +174,7 @@ impl<B: Backend> DynTensor<B> {
     ///
     /// # Panics
     /// If the types are incorrect.
-    pub fn expect_downcast_clone<const R: usize, K>(&self) -> Tensor<B, R, K>
+    pub fn unwrap_clone<const R: usize, K>(&self) -> Tensor<B, R, K>
     where
         K: 'static + BasicOps<B>,
     {
@@ -212,20 +212,23 @@ impl<B: Backend> DynTensor<B> {
         impl<B: Backend, const R: usize> RankHandler for SliceHandler<B, R> {
             type Output = DynTensor<B>;
             fn call<const R2: usize>(self) -> Result<Self::Output, DynTensorError> {
-                match self.tensor.kind {
-                    KindFlag::Float => {
-                        let tensor: Tensor<B, R, Float> = self.tensor.expect_downcast_clone();
-                        Ok(DynTensor::new(tensor.slice(self.slices)))
-                    }
-                    KindFlag::Int => {
-                        let tensor: Tensor<B, R, Int> = self.tensor.expect_downcast_clone();
-                        Ok(DynTensor::new(tensor.slice(self.slices)))
-                    }
-                    KindFlag::Bool => {
-                        let tensor: Tensor<B, R, Bool> = self.tensor.expect_downcast_clone();
-                        Ok(DynTensor::new(tensor.slice(self.slices)))
-                    }
-                }
+                Ok(match self.tensor.kind {
+                    KindFlag::Float => self
+                        .tensor
+                        .unwrap_clone::<R, Float>()
+                        .slice(self.slices)
+                        .into(),
+                    KindFlag::Int => self
+                        .tensor
+                        .unwrap_clone::<R, Int>()
+                        .slice(self.slices)
+                        .into(),
+                    KindFlag::Bool => self
+                        .tensor
+                        .unwrap_clone::<R, Bool>()
+                        .slice(self.slices)
+                        .into(),
+                })
             }
         }
         dispatch_rank(
@@ -262,20 +265,21 @@ impl<B: Backend> DynTensor<B> {
         impl<'a, B: Backend> RankHandler for SliceDynHandler<'a, B> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
-                match self.tensor.kind {
-                    KindFlag::Float => {
-                        let tensor: Tensor<B, R, Float> = self.tensor.expect_downcast_clone();
-                        Ok(DynTensor::new(operations::slice_dyn(tensor, self.slices)))
-                    }
+                Ok(match self.tensor.kind {
+                    KindFlag::Float => operations::slice_dyn::<B, R, Float>(
+                        self.tensor.unwrap_clone(),
+                        self.slices,
+                    )
+                    .into(),
                     KindFlag::Int => {
-                        let tensor: Tensor<B, R, Int> = self.tensor.expect_downcast_clone();
-                        Ok(DynTensor::new(operations::slice_dyn(tensor, self.slices)))
+                        operations::slice_dyn::<B, R, Int>(self.tensor.unwrap_clone(), self.slices)
+                            .into()
                     }
                     KindFlag::Bool => {
-                        let tensor: Tensor<B, R, Bool> = self.tensor.expect_downcast_clone();
-                        Ok(DynTensor::new(operations::slice_dyn(tensor, self.slices)))
+                        operations::slice_dyn::<B, R, Bool>(self.tensor.unwrap_clone(), self.slices)
+                            .into()
                     }
-                }
+                })
             }
         }
         dispatch_rank(
@@ -336,23 +340,23 @@ impl<B: Backend> DynTensor<B> {
         impl<B: Backend, const R2: usize> RankHandler for SliceAssignHandler<B, R2> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
-                match self.tensor.kind {
-                    KindFlag::Float => {
-                        let tensor: Tensor<B, R, Float> = self.tensor.expect_downcast_clone();
-                        let values: Tensor<B, R, Float> = self.values.expect_downcast_clone();
-                        Ok(DynTensor::new(tensor.slice_assign(self.slices, values)))
-                    }
-                    KindFlag::Int => {
-                        let tensor: Tensor<B, R, Int> = self.tensor.expect_downcast_clone();
-                        let values: Tensor<B, R, Int> = self.values.expect_downcast_clone();
-                        Ok(DynTensor::new(tensor.slice_assign(self.slices, values)))
-                    }
-                    KindFlag::Bool => {
-                        let tensor: Tensor<B, R, Bool> = self.tensor.expect_downcast_clone();
-                        let values: Tensor<B, R, Bool> = self.values.expect_downcast_clone();
-                        Ok(DynTensor::new(tensor.slice_assign(self.slices, values)))
-                    }
-                }
+                Ok(match self.tensor.kind {
+                    KindFlag::Float => self
+                        .tensor
+                        .unwrap_clone::<R, Float>()
+                        .slice_assign(self.slices, self.values.unwrap_clone())
+                        .into(),
+                    KindFlag::Int => self
+                        .tensor
+                        .unwrap_clone::<R, Int>()
+                        .slice_assign(self.slices, self.values.unwrap_clone())
+                        .into(),
+                    KindFlag::Bool => self
+                        .tensor
+                        .unwrap_clone::<R, Bool>()
+                        .slice_assign(self.slices, self.values.unwrap_clone())
+                        .into(),
+                })
             }
         }
         dispatch_rank(
@@ -421,26 +425,23 @@ impl<B: Backend> DynTensor<B> {
         impl<B: Backend> RankHandler for FlattenHandler<B> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
-                match self.tensor.kind {
-                    KindFlag::Float => {
-                        let tensor: Tensor<B, R, Float> = self.tensor.expect_downcast_clone();
-                        Ok(DynTensor::new(
-                            tensor.flatten::<1>(0, self.tensor.rank() - 1),
-                        ))
-                    }
-                    KindFlag::Int => {
-                        let tensor: Tensor<B, R, Int> = self.tensor.expect_downcast_clone();
-                        Ok(DynTensor::new(
-                            tensor.flatten::<1>(0, self.tensor.rank() - 1),
-                        ))
-                    }
-                    KindFlag::Bool => {
-                        let tensor: Tensor<B, R, Bool> = self.tensor.expect_downcast_clone();
-                        Ok(DynTensor::new(
-                            tensor.flatten::<1>(0, self.tensor.rank() - 1),
-                        ))
-                    }
-                }
+                Ok(match self.tensor.kind {
+                    KindFlag::Float => self
+                        .tensor
+                        .unwrap_clone::<R, Float>()
+                        .flatten::<1>(0, self.tensor.rank() - 1)
+                        .into(),
+                    KindFlag::Int => self
+                        .tensor
+                        .unwrap_clone::<R, Int>()
+                        .flatten::<1>(0, self.tensor.rank() - 1)
+                        .into(),
+                    KindFlag::Bool => self
+                        .tensor
+                        .unwrap_clone::<R, Bool>()
+                        .flatten::<1>(0, self.tensor.rank() - 1)
+                        .into(),
+                })
             }
         }
         dispatch_rank(self.rank(), FlattenHandler { tensor: self })
@@ -470,32 +471,32 @@ impl<B: Backend> DynTensor<B> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
                 let target_kind: KindFlag = self.dtype.into();
-                match self.tensor.kind {
+                Ok(match self.tensor.kind {
                     KindFlag::Float => {
-                        let tensor: Tensor<B, R, Float> = self.tensor.expect_downcast_clone();
-                        Ok(match target_kind {
-                            KindFlag::Float => DynTensor::new(tensor.cast(self.dtype)),
-                            KindFlag::Int => DynTensor::new(tensor.int().cast(self.dtype)),
-                            KindFlag::Bool => DynTensor::new(tensor.bool()),
-                        })
+                        let tensor: Tensor<B, R, Float> = self.tensor.unwrap_clone();
+                        match target_kind {
+                            KindFlag::Float => tensor.cast(self.dtype).into(),
+                            KindFlag::Int => tensor.int().cast(self.dtype).into(),
+                            KindFlag::Bool => tensor.bool().into(),
+                        }
                     }
                     KindFlag::Int => {
-                        let tensor: Tensor<B, R, Int> = self.tensor.expect_downcast_clone();
-                        Ok(match target_kind {
-                            KindFlag::Float => DynTensor::new(tensor.float().cast(self.dtype)),
-                            KindFlag::Int => DynTensor::new(tensor.cast(self.dtype)),
-                            KindFlag::Bool => DynTensor::new(tensor.bool()),
-                        })
+                        let tensor: Tensor<B, R, Int> = self.tensor.unwrap_clone();
+                        match target_kind {
+                            KindFlag::Float => tensor.float().cast(self.dtype).into(),
+                            KindFlag::Int => tensor.cast(self.dtype).into(),
+                            KindFlag::Bool => tensor.bool().into(),
+                        }
                     }
                     KindFlag::Bool => {
-                        let tensor: Tensor<B, R, Bool> = self.tensor.expect_downcast_clone();
-                        Ok(match target_kind {
-                            KindFlag::Float => DynTensor::new(tensor.float().cast(self.dtype)),
-                            KindFlag::Int => DynTensor::new(tensor.int().cast(self.dtype)),
+                        let tensor: Tensor<B, R, Bool> = self.tensor.unwrap_clone();
+                        match target_kind {
+                            KindFlag::Float => tensor.float().cast(self.dtype).into(),
+                            KindFlag::Int => tensor.int().cast(self.dtype).into(),
                             KindFlag::Bool => self.tensor,
-                        })
+                        }
                     }
-                }
+                })
             }
         }
         dispatch_rank(
@@ -534,23 +535,23 @@ impl<B: Backend> DynTensor<B> {
         impl<'a, B: Backend> RankHandler for ToDeviceHandler<'a, B> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
-                match self.tensor.kind {
-                    KindFlag::Float => {
-                        let tensor: Tensor<B, R, Float> = self.tensor.expect_downcast_clone();
-                        let tensor = tensor.to_device(self.device);
-                        Ok(DynTensor::new(tensor))
-                    }
-                    KindFlag::Int => {
-                        let tensor: Tensor<B, R, Int> = self.tensor.expect_downcast_clone();
-                        let tensor = tensor.to_device(self.device);
-                        Ok(DynTensor::new(tensor))
-                    }
-                    KindFlag::Bool => {
-                        let tensor: Tensor<B, R, Bool> = self.tensor.expect_downcast_clone();
-                        let tensor = tensor.to_device(self.device);
-                        Ok(DynTensor::new(tensor))
-                    }
-                }
+                Ok(match self.tensor.kind {
+                    KindFlag::Float => self
+                        .tensor
+                        .unwrap_clone::<R, Float>()
+                        .to_device(self.device)
+                        .into(),
+                    KindFlag::Int => self
+                        .tensor
+                        .unwrap_clone::<R, Int>()
+                        .to_device(self.device)
+                        .into(),
+                    KindFlag::Bool => self
+                        .tensor
+                        .unwrap_clone::<R, Bool>()
+                        .to_device(self.device)
+                        .into(),
+                })
             }
         }
         dispatch_rank(
@@ -585,20 +586,15 @@ impl<B: Backend> DynTensor<B> {
             type Output = DynTensor<B>;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
                 let kind: KindFlag = self.data.dtype.into();
-                match kind {
+                Ok(match kind {
                     KindFlag::Float => {
-                        let tensor: Tensor<B, R, Float> = Tensor::from_data(self.data, self.device);
-                        Ok(DynTensor::new(tensor))
+                        Tensor::<B, R, Float>::from_data(self.data, self.device).into()
                     }
-                    KindFlag::Int => {
-                        let tensor: Tensor<B, R, Int> = Tensor::from_data(self.data, self.device);
-                        Ok(DynTensor::new(tensor))
-                    }
+                    KindFlag::Int => Tensor::<B, R, Int>::from_data(self.data, self.device).into(),
                     KindFlag::Bool => {
-                        let tensor: Tensor<B, R, Bool> = Tensor::from_data(self.data, self.device);
-                        Ok(DynTensor::new(tensor))
+                        Tensor::<B, R, Bool>::from_data(self.data, self.device).into()
                     }
-                }
+                })
             }
         }
         dispatch_rank(data.rank(), FromDataHandler { data, device })
@@ -618,20 +614,11 @@ impl<B: Backend> DynTensor<B> {
         impl<B: Backend> RankHandler for ToDataHandler<B> {
             type Output = TensorData;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
-                match self.tensor.kind {
-                    KindFlag::Float => {
-                        let tensor: Tensor<B, R, Float> = self.tensor.expect_downcast_clone();
-                        Ok(tensor.to_data())
-                    }
-                    KindFlag::Int => {
-                        let tensor: Tensor<B, R, Int> = self.tensor.expect_downcast_clone();
-                        Ok(tensor.to_data())
-                    }
-                    KindFlag::Bool => {
-                        let tensor: Tensor<B, R, Bool> = self.tensor.expect_downcast_clone();
-                        Ok(tensor.to_data())
-                    }
-                }
+                Ok(match self.tensor.kind {
+                    KindFlag::Float => self.tensor.unwrap_clone::<R, Float>().to_data(),
+                    KindFlag::Int => self.tensor.unwrap_clone::<R, Int>().to_data(),
+                    KindFlag::Bool => self.tensor.unwrap_clone::<R, Bool>().to_data(),
+                })
             }
         }
         dispatch_rank(self.rank(), ToDataHandler { tensor: self })
