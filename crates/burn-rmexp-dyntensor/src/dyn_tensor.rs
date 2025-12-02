@@ -178,7 +178,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Slice the stub tensor.
     ///
-    /// Generated up to rank 12.
+    /// Dispatches via [`dispatch_rank`].
     ///
     /// # Arguments
     /// - `slices`: see [`Tensor::slice`].
@@ -233,7 +233,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// A dynamic version of [`DynTensor::slice`].
     ///
-    /// Generated up to rank 12.
+    /// Dispatches via [`dispatch_rank`].
     pub fn slice_dyn(
         self,
         slices: &[Slice],
@@ -276,7 +276,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Assign values to a slice.
     ///
-    /// Generated up to rank 12.
+    /// Dispatches via [`dispatch_rank`].
     pub fn slice_assign<const R2: usize, S, V>(
         self,
         slices: S,
@@ -346,7 +346,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Dynamic slice rank version of [`DynTensor::slice_assign`].
     ///
-    /// Generated up to rank=12.
+    /// Dispatches via [`dispatch_rank`].
     pub fn slice_assign_dyn<V>(
         self,
         slices: &[Slice],
@@ -379,7 +379,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Flatten the tensor.
     ///
-    /// Generated up to rank 12.
+    /// Dispatches via [`dispatch_rank`].
     pub fn flatten(self) -> Result<Self, DynTensorError> {
         struct FlattenHandler<B: Backend> {
             tensor: DynTensor<B>,
@@ -415,6 +415,8 @@ impl<B: Backend> DynTensor<B> {
     /// Cast the tensor.
     ///
     /// Auto-converts kind if necessary.
+    ///
+    /// Dispatches via [`dispatch_rank`].
     pub fn cast(
         self,
         dtype: DType,
@@ -466,7 +468,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Move the tensor to the given device.
     ///
-    /// Generated up to rank 12.
+    /// Dispatches via [`dispatch_rank`].
     pub fn to_device(
         self,
         device: &B::Device,
@@ -512,7 +514,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Convert a [`TensorData`] to a [`DynTensor`].
     ///
-    /// Generated up to rank 12.
+    /// Dispatches via [`dispatch_rank`].
     pub fn from_data(
         data: TensorData,
         device: &B::Device,
@@ -546,7 +548,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Convert the tensor to a [`TensorData`].
     ///
-    /// Generated up to rank 12.
+    /// Dispatches via [`dispatch_rank`].
     pub fn to_data(self) -> Result<TensorData, DynTensorError> {
         struct ToDataHandler<B: Backend> {
             tensor: DynTensor<B>,
