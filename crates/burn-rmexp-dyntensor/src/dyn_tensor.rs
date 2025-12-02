@@ -21,13 +21,17 @@ pub enum DynTensorError {
 }
 
 /// Dynamic to static rank dispatch handler.
-trait RankHandler {
+pub trait RankHandler {
     type Output;
+
+    /// Call the static-rank handler.
     fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError>;
 }
 
 /// Dynamic rank dispatch.
-fn dispatch_rank<H: RankHandler>(
+///
+/// Handles up to rank=12.
+pub fn dispatch_rank<H: RankHandler>(
     rank: usize,
     handler: H,
 ) -> Result<H::Output, DynTensorError> {
