@@ -9,7 +9,7 @@ documentation = "https://docs.rs/burn-rmexp-tensorlib/latest/"
 description = "burn remote experiment tensor lib"
 
 [dependencies]
-burn-rmexp-dyntensor = { version = "0.0.1", path = "../burn-rmexp-dyntensor" }
+burn-rmexp-dyntensor = { version = "0.0.2", path = "../burn-rmexp-dyntensor" }
 
 burn = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
