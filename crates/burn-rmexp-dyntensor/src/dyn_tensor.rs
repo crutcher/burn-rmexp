@@ -67,7 +67,7 @@ pub enum ValuesArg<B: Backend> {
 
 impl<B: Backend> ValuesArg<B> {
     /// Convert to a [`DynTensor`] on a given device.
-    fn to_dyn_device(
+    fn into_dyntensor(
         self,
         device: &B::Device,
     ) -> Result<DynTensor<B>, DynTensorError> {
@@ -145,6 +145,8 @@ impl<B: Backend> DynTensor<B> {
     }
 
     /// Returns the size estimate of the tensor in bytes.
+    ///
+    /// This is `self.dtype().size() * self.num_elements()`.
     pub fn size_estimate(&self) -> usize {
         self.dtype.size() * self.num_elements()
     }
@@ -167,8 +169,8 @@ impl<B: Backend> DynTensor<B> {
     /// Downcasts the tensor to a specific rank and kind.
     ///
     /// # Result
-    ///
-    /// Either a `Some(Tensor)` clone (if the downcast is correct), or `None`.
+    /// - `Some(Tensor<B, R, K>)`: if the params are correct,
+    /// - `None`: otherwise.
     pub fn downcast_clone<const R: usize, K>(&self) -> Option<Tensor<B, R, K>>
     where
         K: 'static + BasicOps<B>,
@@ -181,11 +183,11 @@ impl<B: Backend> DynTensor<B> {
     /// Dispatches via [`dispatch_rank`].
     ///
     /// # Arguments
-    /// - `slices`: see [`Tensor::slice`].
+    /// - `slices`: a `SliceArg<R>`.
     ///
     /// # Returns
-    ///
-    /// A sliced `TensorStub`, or an error.
+    /// - `Ok(DynTensor)`: the sliced tensor.
+    /// - `Err(DynTensorError)`: an error.
     pub fn slice<const R: usize, S>(
         self,
         slices: S,
@@ -203,7 +205,7 @@ impl<B: Backend> DynTensor<B> {
             tensor: DynTensor<B>,
             slices: [Slice; R],
         }
-        impl<'a, B: Backend, const R: usize> RankHandler for SliceHandler<B, R> {
+        impl<B: Backend, const R: usize> RankHandler for SliceHandler<B, R> {
             type Output = DynTensor<B>;
             fn call<const R2: usize>(self) -> Result<Self::Output, DynTensorError> {
                 match self.tensor.kind {
@@ -234,6 +236,13 @@ impl<B: Backend> DynTensor<B> {
     /// A dynamic version of [`DynTensor::slice`].
     ///
     /// Dispatches via [`dispatch_rank`].
+    ///
+    /// # Arguments
+    /// - `slices`: a dynamic slice of `Slice`.
+    ///
+    /// # Returns
+    /// - `Ok(DynTensor)`: the sliced tensor.
+    /// - `Err(DynTensorError)`: an error.
     pub fn slice_dyn(
         self,
         slices: &[Slice],
@@ -277,6 +286,14 @@ impl<B: Backend> DynTensor<B> {
     /// Assign values to a slice.
     ///
     /// Dispatches via [`dispatch_rank`].
+    ///
+    /// # Arguments
+    /// - `slices`: a `SlicesArg<R2>`.
+    /// - `values`: a coercible value; see [`ValuesArg`].
+    ///
+    /// # Returns
+    /// - `Ok(DynTensor)`: a converted tensor.
+    /// - `Err(DynTensorError)`: an error.
     pub fn slice_assign<const R2: usize, S, V>(
         self,
         slices: S,
@@ -288,7 +305,7 @@ impl<B: Backend> DynTensor<B> {
     {
         let rank = self.rank();
         let slices = self.shape().into_slices(slices);
-        let values: DynTensor<B> = values.into().to_dyn_device(&self.device())?;
+        let values: DynTensor<B> = values.into().into_dyntensor(&self.device())?;
 
         indexing::check_slices_bounds(&self.shape(), &slices)
             .map_err(DynTensorError::SliceError)?;
@@ -347,6 +364,14 @@ impl<B: Backend> DynTensor<B> {
     /// Dynamic slice rank version of [`DynTensor::slice_assign`].
     ///
     /// Dispatches via [`dispatch_rank`].
+    ///
+    /// # Arguments
+    /// - `slices`: a dynamic slice of `Slice`.
+    /// - `values`: a coercible value; see [`ValuesArg`].
+    ///
+    /// # Returns
+    /// - `Ok(DynTensor)`: a converted tensor.
+    /// - `Err(DynTensorError)`: an error.
     pub fn slice_assign_dyn<V>(
         self,
         slices: &[Slice],
@@ -380,6 +405,10 @@ impl<B: Backend> DynTensor<B> {
     /// Flatten the tensor.
     ///
     /// Dispatches via [`dispatch_rank`].
+    ///
+    /// # Returns
+    /// - `Ok(DynTensor)`: a flattened (rank=1) tensor.
+    /// - `Err(DynTensorError)`: an error.
     pub fn flatten(self) -> Result<Self, DynTensorError> {
         struct FlattenHandler<B: Backend> {
             tensor: DynTensor<B>,
@@ -417,6 +446,13 @@ impl<B: Backend> DynTensor<B> {
     /// Auto-converts kind if necessary.
     ///
     /// Dispatches via [`dispatch_rank`].
+    ///
+    /// # Arguments
+    /// - `dtype`: the target data type.
+    ///
+    /// # Returns
+    /// - `Ok(DynTensor)`: a converted tensor.
+    /// - `Err(DynTensorError)`: an error.
     pub fn cast(
         self,
         dtype: DType,
@@ -468,7 +504,16 @@ impl<B: Backend> DynTensor<B> {
 
     /// Move the tensor to the given device.
     ///
+    /// Moving to the same device is an inexpensive no-op.
+    ///
     /// Dispatches via [`dispatch_rank`].
+    ///
+    /// # Arguments
+    /// - `device`: the target device.
+    ///
+    /// # Returns
+    /// - `Ok(DynTensor<B>)`: the moved tensor.
+    /// - `Err(DynTensorError)`: an error.
     pub fn to_device(
         self,
         device: &B::Device,
@@ -515,6 +560,14 @@ impl<B: Backend> DynTensor<B> {
     /// Convert a [`TensorData`] to a [`DynTensor`].
     ///
     /// Dispatches via [`dispatch_rank`].
+    ///
+    /// # Arguments
+    /// - `data`: source [`TensorData`].
+    /// - `device`: the target device.
+    ///
+    /// # Returns
+    /// - `Ok(DynTensor<B>)`: the converted tensor.
+    /// - `Err(DynTensorError)`: an error.
     pub fn from_data(
         data: TensorData,
         device: &B::Device,
@@ -549,6 +602,10 @@ impl<B: Backend> DynTensor<B> {
     /// Convert the tensor to a [`TensorData`].
     ///
     /// Dispatches via [`dispatch_rank`].
+    ///
+    /// # Returns
+    /// - `Ok(TensorData)`: the converted data.
+    /// - `Err(DynTensorError)`: an error.
     pub fn to_data(self) -> Result<TensorData, DynTensorError> {
         struct ToDataHandler<B: Backend> {
             tensor: DynTensor<B>,

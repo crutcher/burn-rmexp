@@ -266,16 +266,16 @@ impl<B: Backend> TensorLibrary<B> for LazyBuilderLibrary<B> {
                         return Ok(Some(tensor));
                     }
 
-                    let builder = self.builders.get(&uuid);
-                    if builder.is_none() {
-                        return Ok(None);
+                    match self.builders.get(&uuid) {
+                        None => Ok(None),
+                        Some(builder) => match builder.build(query.clone()).await? {
+                            Some(tensor) => {
+                                self.cached.insert(uuid, tensor.clone());
+                                Ok(Some(tensor))
+                            }
+                            None => Ok(None),
+                        },
                     }
-
-                    let qr = builder.unwrap().build(query.clone()).await?;
-                    if qr.is_some() {
-                        self.cached.insert(uuid, qr.as_ref().unwrap().clone());
-                    }
-                    Ok(qr)
                 }
                 _ => Ok(None),
             }
