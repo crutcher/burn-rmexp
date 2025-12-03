@@ -332,7 +332,7 @@ mod tests {
             .expect("tensor not found");
 
         dyn_tensor
-            .to_data()
+            .into_data()
             .unwrap()
             .assert_eq(&source.to_data(), true);
     }

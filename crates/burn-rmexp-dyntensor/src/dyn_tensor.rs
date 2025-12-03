@@ -531,7 +531,7 @@ impl<B: Backend> DynTensor<B> {
     /// # Result
     /// - `Ok(TensorData)`: the converted data.
     /// - `Err(DynTensorError)`: an error.
-    pub fn to_data(self) -> Result<TensorData, DynTensorError> {
+    pub fn into_data(self) -> Result<TensorData, DynTensorError> {
         struct ToDataHandler<B: Backend> {
             this: DynTensor<B>,
         }
@@ -539,13 +539,24 @@ impl<B: Backend> DynTensor<B> {
             type Output = TensorData;
             fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError> {
                 Ok(match self.this.kind {
-                    KindFlag::Float => self.this.unwrap_clone::<R, Float>().to_data(),
-                    KindFlag::Int => self.this.unwrap_clone::<R, Int>().to_data(),
-                    KindFlag::Bool => self.this.unwrap_clone::<R, Bool>().to_data(),
+                    KindFlag::Float => self.this.unwrap_clone::<R, Float>().into_data(),
+                    KindFlag::Int => self.this.unwrap_clone::<R, Int>().into_data(),
+                    KindFlag::Bool => self.this.unwrap_clone::<R, Bool>().into_data(),
                 })
             }
         }
         rank_dispatch::dispatch_rank(self.rank(), ToDataHandler { this: self })
+    }
+
+    /// Convert the tensor to a [`TensorData`].
+    ///
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
+    ///
+    /// # Result
+    /// - `Ok(TensorData)`: the converted data.
+    /// - `Err(DynTensorError)`: an error.
+    pub fn to_data(self) -> Result<TensorData, DynTensorError> {
+        self.clone().into_data()
     }
 }
 
@@ -596,14 +607,14 @@ mod tests {
         clone.to_data().assert_eq(&source.clone().to_data(), true);
 
         stub.clone()
-            .to_data()
+            .into_data()
             .unwrap()
             .assert_eq(&source.clone().to_data(), true);
 
         let flatten = stub.clone().flatten().unwrap();
         assert_eq!(flatten.shape(), [6].into());
         flatten
-            .to_data()
+            .into_data()
             .unwrap()
             .assert_eq(&source.clone().flatten::<1>(0, 1).to_data(), true);
     }
@@ -641,14 +652,14 @@ mod tests {
         clone.to_data().assert_eq(&source.clone().to_data(), true);
 
         stub.clone()
-            .to_data()
+            .into_data()
             .unwrap()
             .assert_eq(&source.clone().to_data(), true);
 
         let flatten = stub.clone().flatten().unwrap();
         assert_eq!(flatten.shape(), [6].into());
         flatten
-            .to_data()
+            .into_data()
             .unwrap()
             .assert_eq(&source.clone().flatten::<1>(0, 1).to_data(), true);
     }
@@ -686,14 +697,14 @@ mod tests {
         clone.to_data().assert_eq(&source.clone().to_data(), true);
 
         stub.clone()
-            .to_data()
+            .into_data()
             .unwrap()
             .assert_eq(&source.clone().to_data(), true);
 
         let flatten = stub.clone().flatten().unwrap();
         assert_eq!(flatten.shape(), [6].into());
         flatten
-            .to_data()
+            .into_data()
             .unwrap()
             .assert_eq(&source.clone().flatten::<1>(0, 1).to_data(), true);
     }
