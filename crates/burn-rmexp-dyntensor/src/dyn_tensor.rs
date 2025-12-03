@@ -1,59 +1,12 @@
 use crate::clone_box::CloneBox;
-use crate::indexing;
-use crate::indexing::SlicesError;
+use crate::errors::DynTensorError;
 use crate::kind::KindFlag;
 use crate::operations;
+use crate::rank_dispatch::RankHandler;
+use crate::{indexing, rank_dispatch};
 use burn::Tensor;
 use burn::prelude::{Backend, Bool, Float, Int, Shape, SliceArg, TensorData};
 use burn::tensor::{BasicOps, DType, Slice};
-
-/// [`DynTensor`] accessor errors.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DynTensorError {
-    /// An error occurred while slicing.
-    SliceError(SlicesError),
-
-    /// Invalid Arguments.
-    InvalidArgument { msg: String },
-
-    /// The tensor rank is not supported for the requested operation.
-    UnsupportedRank { msg: String, rank: usize },
-}
-
-/// Dynamic to static rank dispatch handler.
-pub trait RankHandler {
-    type Output;
-
-    /// Call the static-rank handler.
-    fn call<const R: usize>(self) -> Result<Self::Output, DynTensorError>;
-}
-
-/// Dynamic rank dispatch.
-///
-/// Handles up to rank=12.
-pub fn dispatch_rank<H: RankHandler>(
-    rank: usize,
-    handler: H,
-) -> Result<H::Output, DynTensorError> {
-    match rank {
-        1 => handler.call::<1>(),
-        2 => handler.call::<2>(),
-        3 => handler.call::<3>(),
-        4 => handler.call::<4>(),
-        5 => handler.call::<5>(),
-        6 => handler.call::<6>(),
-        7 => handler.call::<7>(),
-        8 => handler.call::<8>(),
-        9 => handler.call::<9>(),
-        10 => handler.call::<10>(),
-        11 => handler.call::<11>(),
-        12 => handler.call::<12>(),
-        _ => Err(DynTensorError::UnsupportedRank {
-            msg: "unsupported rank".to_string(),
-            rank,
-        }),
-    }
-}
 
 /// Values conversion trait for [`DynTensor::slice_assign`].
 pub trait ValuesArg<B: Backend>: Sized {
@@ -184,7 +137,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Slice the stub tensor.
     ///
-    /// Dispatches via [`dispatch_rank`].
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
     ///
     /// # Arguments
     /// - `slices`: a `SliceArg<R>`.
@@ -227,12 +180,12 @@ impl<B: Backend> DynTensor<B> {
                 })
             }
         }
-        dispatch_rank(rank, SliceHandler { this: self, slices })
+        rank_dispatch::dispatch_rank(rank, SliceHandler { this: self, slices })
     }
 
     /// A dynamic version of [`DynTensor::slice`].
     ///
-    /// Dispatches via [`dispatch_rank`].
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
     ///
     /// # Arguments
     /// - `slices`: a dynamic slice of `Slice`.
@@ -271,12 +224,12 @@ impl<B: Backend> DynTensor<B> {
                 })
             }
         }
-        dispatch_rank(rank, SliceDynHandler { this: self, slices })
+        rank_dispatch::dispatch_rank(rank, SliceDynHandler { this: self, slices })
     }
 
     /// Assign values to a slice.
     ///
-    /// Dispatches via [`dispatch_rank`].
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
     ///
     /// # Arguments
     /// - `slices`: a `SlicesArg<R2>`.
@@ -342,7 +295,7 @@ impl<B: Backend> DynTensor<B> {
                 })
             }
         }
-        dispatch_rank(
+        rank_dispatch::dispatch_rank(
             rank,
             SliceAssignHandler {
                 this: self.clone(),
@@ -354,7 +307,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Dynamic slice rank version of [`DynTensor::slice_assign`].
     ///
-    /// Dispatches via [`dispatch_rank`].
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
     ///
     /// # Arguments
     /// - `slices`: a dynamic slice of `Slice`.
@@ -384,7 +337,7 @@ impl<B: Backend> DynTensor<B> {
             }
         }
         let values = values.into_values(&self.device())?;
-        dispatch_rank(
+        rank_dispatch::dispatch_rank(
             self.rank(),
             SliceAssignDynHandler {
                 this: self,
@@ -396,7 +349,7 @@ impl<B: Backend> DynTensor<B> {
 
     /// Flatten the tensor.
     ///
-    /// Dispatches via [`dispatch_rank`].
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
     ///
     /// # Result
     /// - `Ok(DynTensor)`: a flattened (rank=1) tensor.
@@ -427,14 +380,14 @@ impl<B: Backend> DynTensor<B> {
                 })
             }
         }
-        dispatch_rank(self.rank(), FlattenHandler { tensor: self })
+        rank_dispatch::dispatch_rank(self.rank(), FlattenHandler { tensor: self })
     }
 
     /// Cast the tensor.
     ///
     /// Auto-converts kind if necessary.
     ///
-    /// Dispatches via [`dispatch_rank`].
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
     ///
     /// # Arguments
     /// - `dtype`: the target data type.
@@ -482,14 +435,14 @@ impl<B: Backend> DynTensor<B> {
                 })
             }
         }
-        dispatch_rank(self.rank(), CastHandler { this: self, dtype })
+        rank_dispatch::dispatch_rank(self.rank(), CastHandler { this: self, dtype })
     }
 
     /// Move the tensor to the given device.
     ///
     /// Moving to the same device is an inexpensive no-op.
     ///
-    /// Dispatches via [`dispatch_rank`].
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
     ///
     /// # Arguments
     /// - `device`: the target device.
@@ -531,12 +484,12 @@ impl<B: Backend> DynTensor<B> {
                 })
             }
         }
-        dispatch_rank(self.rank(), ToDeviceHandler { this: self, device })
+        rank_dispatch::dispatch_rank(self.rank(), ToDeviceHandler { this: self, device })
     }
 
     /// Convert a [`TensorData`] to a [`DynTensor`].
     ///
-    /// Dispatches via [`dispatch_rank`].
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
     ///
     /// # Arguments
     /// - `data`: source [`TensorData`].
@@ -568,12 +521,12 @@ impl<B: Backend> DynTensor<B> {
                 })
             }
         }
-        dispatch_rank(data.rank(), FromDataHandler { data, device })
+        rank_dispatch::dispatch_rank(data.rank(), FromDataHandler { data, device })
     }
 
     /// Convert the tensor to a [`TensorData`].
     ///
-    /// Dispatches via [`dispatch_rank`].
+    /// Dispatches via [`rank_dispatch::dispatch_rank`].
     ///
     /// # Result
     /// - `Ok(TensorData)`: the converted data.
@@ -592,7 +545,7 @@ impl<B: Backend> DynTensor<B> {
                 })
             }
         }
-        dispatch_rank(self.rank(), ToDataHandler { this: self })
+        rank_dispatch::dispatch_rank(self.rank(), ToDataHandler { this: self })
     }
 }
 

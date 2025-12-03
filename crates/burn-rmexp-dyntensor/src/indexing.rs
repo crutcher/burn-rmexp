@@ -1,4 +1,5 @@
 //! # Tensor Indexing Utilities
+use crate::errors::SlicingError;
 use burn::prelude::Shape;
 use burn::tensor::Slice;
 use std::fmt::{Display, Formatter};
@@ -78,21 +79,6 @@ fn format_shape(shape: &Shape) -> String {
     format!("[{}]", dim_list)
 }
 
-/// Errors that can occur when checking tensor slices.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum SlicesError {
-    OutOfBounds {
-        msg: String,
-        shape: Shape,
-        slices: Vec<Slice>,
-    },
-    InvalidRank {
-        msg: String,
-        shape: Shape,
-        slices: Vec<Slice>,
-    },
-}
-
 /// Checks that the given slices are valid for the given tensor shape.
 ///
 /// # Arguments
@@ -105,11 +91,11 @@ pub enum SlicesError {
 pub fn check_slices_bounds(
     shape: &Shape,
     slices: &[Slice],
-) -> Result<(), SlicesError> {
+) -> Result<(), SlicingError> {
     let rank = shape.rank();
     let k = slices.len();
     if k > rank {
-        return Err(SlicesError::InvalidRank {
+        return Err(SlicingError::InvalidRank {
             msg: format!(
                 "Slices [{}] length ({k}) is greater than shape {} rank ({rank})",
                 format_slice_list(slices),
@@ -125,7 +111,7 @@ pub fn check_slices_bounds(
         if maybe_wrap_index(slice.start, bounds).is_none()
             || (slice.end.is_some() && maybe_wrap_index(slice.end.unwrap(), bounds + 1).is_none())
         {
-            return Err(SlicesError::OutOfBounds {
+            return Err(SlicingError::OutOfBounds {
                 msg: format!(
                     "Slices [{}] out of bounds for tensor shape {}",
                     format_slice_list(slices),
@@ -171,7 +157,7 @@ mod tests {
         )
         .unwrap_err()
         {
-            SlicesError::InvalidRank {
+            SlicingError::InvalidRank {
                 msg,
                 shape: err_shape,
                 slices: _,
@@ -186,7 +172,7 @@ mod tests {
         }
 
         match check_slices_bounds(&shape, &[Slice::new(4, None, 1)]).unwrap_err() {
-            SlicesError::OutOfBounds {
+            SlicingError::OutOfBounds {
                 msg,
                 shape: err_shape,
                 slices: _,
